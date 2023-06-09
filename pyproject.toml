@@ -28,7 +28,7 @@ requires-python = ">=3.7"
 
 	[project.optional-dependencies]
 	build = ["build", "twine"]
-	dev = ["black", "bumpver", "flake8", "isort", "pylint"]
+	dev = ["black", "bumpver", "flake8", "isort", "pylint", "pylint_quotes"]
 
 	[project.urls]
 	Homepage = "https://github.com/lfavole/songs-dl"
@@ -79,12 +79,12 @@ disable = [
 expected-line-ending-format = "CRLF"
 include-naming-hint = "y"
 
-[basic]
+[tool.pylint.basic]
 allowed-redefined-builtins = "id"
-good-names = ["f", "i", "id", "md", "pk"]
-no-docstring-rgx = "(^_|Config$|Admin$|Inline$|^(main|contribute_to_argparse|Meta|get_absolute_url)$)"
+good-names = ["f", "i", "id"]
+no-docstring-rgx = "^main$"
 
-[pylint_quotes]
+[tool.pylint.pylint_quotes]
 string-quote = "double"
 triple-quote = "double"
 docstring-quote = "double"
