@@ -1,0 +1,90 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "songs-dl"
+version = "2023.6.9"
+description = "Download songs on YouTube and add metadata."
+readme = "README.md"
+authors = [{ name = "Laurent FAVOLE", email = "laurentfavole03@gmail.com" }]
+license = { file = "LICENSE" }
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "License :: Public Domain",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Sound/Audio",
+]
+keywords = ["youtube", "music"]
+dependencies = [
+    "mutagen",
+    "rapidfuzz",
+	"requests",
+    "yt-dlp",
+]
+requires-python = ">=3.7"
+
+	[project.optional-dependencies]
+	build = ["build", "twine"]
+	dev = ["black", "bumpver", "flake8", "isort", "pylint"]
+
+	[project.urls]
+	Homepage = "https://github.com/lfavole/songs-dl"
+
+	[project.scripts]
+	songs-dl = "songs_dl.__main__:main"
+
+[tool.bumpver]
+current_version = "2023.6.9"
+version_pattern = "YYYY.MM.DD"
+commit_message = "Bump version {old_version} -> {new_version}"
+commit = true
+tag = true
+push = true
+
+[tool.bumpver.file_patterns]
+"pyproject.toml" = [
+    'current_version = "{version}"',
+    'version = "{version}"',
+]
+"songs_dl/__init__.py" = ["{version}"]
+
+[tool.black]
+line-length = 120
+
+[tool.isort]
+profile = "black"
+line_length = 120
+skip = "migrations"
+
+[tool.pylint.main]
+jobs = 0
+load-plugins = "pylint_quotes"
+disable = [
+    "bad-indentation",
+    "bare-except",
+    "fixme",
+    "global-statement",
+    "import-outside-toplevel",
+    "invalid-str-returned",
+    "line-too-long",
+    "missing-module-docstring",
+    "missing-timeout",
+    "no-member",
+    "protected-access",
+    "unspecified-encoding",
+]
+expected-line-ending-format = "CRLF"
+include-naming-hint = "y"
+
+[basic]
+allowed-redefined-builtins = "id"
+good-names = ["f", "i", "id", "md", "pk"]
+no-docstring-rgx = "(^_|Config$|Admin$|Inline$|^(main|contribute_to_argparse|Meta|get_absolute_url)$)"
+
+[pylint_quotes]
+string-quote = "double"
+triple-quote = "double"
+docstring-quote = "double"

@@ -1,0 +1,40 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"flake8.args": [
+			"--config",
+			".flake8"
+		],
+        "isort.check": true,
+		"isort.args": [
+			"--settings-path",
+			".isort.cfg"
+		],
+        "isort.severity": {
+            "W": "Warning",
+            "E": "Error"
+        },
+		"pylint.args": [
+			"--rcfile",
+			".pylintrc"
+		],
+		"python.analysis.extraPaths": [
+			"./scripts"
+		],
+		"editor.detectIndentation": false,
+		"editor.insertSpaces": true,
+		"editor.tabSize": 4
+	},
+	"extensions": {
+		"recommendations": [
+			"ms-python.python",
+			"ms-python.vscode-pylance",
+			"ms-python.pylint",
+			"ms-python.isort"
+		]
+	}
+}
