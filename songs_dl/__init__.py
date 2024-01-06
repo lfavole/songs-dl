@@ -201,7 +201,7 @@ def download_song(query: str) -> str | None:
             params["lang"] = (tags_list.get("TLAN", []) + [""])[0] or "eng"
         tags[tag_name] = getattr(mutagen.id3, tag_name)(**params)
 
-    tags.save(filename)
+    tags.save(filename, v2_version=3)
 
     if artist and title:
         final_filename = sanitize_filename(f"{artist} - {title}.mp3")
