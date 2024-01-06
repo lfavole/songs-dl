@@ -51,7 +51,8 @@ def download_musixmatch(song: str, artist: str | None = None, market: str | None
         logger.debug("Can't find mxmProps in search page")
         return []  # we skip Musixmatch
 
-    match2 = re.search(r'''(?sx)
+    match2 = re.search(
+        r"""(?sx)
     "tracks":
     \{"0":
     (
@@ -61,17 +62,22 @@ def download_musixmatch(song: str, artist: str | None = None, market: str | None
         ,"1":|
         \],"length":1
     )
-    ''', match.group(1))
+    """,
+        match.group(1),
+    )
 
     if not match2:
         logger.debug("Can't find tracks list in mxmProps")
         return []  # same thing
 
-    match3 = re.search(r'''(?sx)
+    match3 = re.search(
+        r"""(?sx)
     "attributes":
     ({.*?})
     ,"id":
-    ''', match2.group(1))
+    """,
+        match2.group(1),
+    )
 
     if not match3:
         logger.debug("Can't find attributes in tracks list")

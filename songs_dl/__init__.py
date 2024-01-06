@@ -178,7 +178,9 @@ def download_song(query: str) -> str | None:
                     params["mime"] = "image/jpg"
                     params["data"] = output.getvalue()
                 except OSError:
-                    params["mime"] = get_image_mimetype(mimetype=picture.req.headers.get("Content-Type"), url=picture.url)
+                    params["mime"] = get_image_mimetype(
+                        mimetype=picture.req.headers.get("Content-Type"), url=picture.url
+                    )
                     params["data"] = data
                 break
         else:
