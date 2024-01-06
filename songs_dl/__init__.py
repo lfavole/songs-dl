@@ -25,6 +25,7 @@ except ImportError:
 from .deezer import download_deezer
 from .itunes import download_itunes
 from .monkeypatch_requests import mp_requests
+from .musixmatch import download_musixmatch
 from .spotify import download_spotify
 from .utils import Song, merge_dicts, order_results
 from .youtube import YoutubeSong, download_youtube
@@ -65,12 +66,14 @@ def download_song(query: str) -> str | None:
     results: dict[str, list[Song]] = {
         "spotify": [],
         "itunes": [],
+        "musixmatch": [],
         "deezer": [],
         "youtube": [],
     }
     actions: dict[str, Callable[[str], list[Song]]] = {
         "spotify": download_spotify,
         "itunes": download_itunes,
+        "musixmatch": download_musixmatch,
         "deezer": download_deezer,
         "youtube": download_youtube,
     }
@@ -117,10 +120,11 @@ def download_song(query: str) -> str | None:
     # so there is no filename here
     tags = mutagen.id3.ID3()
 
-    # tags (spotify -> itunes -> deezer -> youtube)
+    # tags (spotify -> itunes -> musixmatch -> deezer -> youtube)
     tags_list = merge_dicts(
         results["spotify"][0].to_id3(),
         results["itunes"][0].to_id3(),
+        results["musixmatch"][0].to_id3(),
         results["deezer"][0].to_id3(),
         results["youtube_dl"][0].to_id3(),
         results["youtube"][0].to_id3(),
