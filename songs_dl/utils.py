@@ -360,7 +360,7 @@ class Song:
         self.isrc = isrc
         self.track_number = (track_number, None) if isinstance(track_number, int) else track_number
         self.copyright = copyright
-        self.lyrics = lyrics
+        self.lyrics = lyrics.rstrip() if isinstance(lyrics, str) else lyrics
         self.picture = picture
         self.comments = comments
 
@@ -457,7 +457,7 @@ def order_results(provider: str, results: list[Song], other_results: dict[str, l
         return results
 
     spotify_song = other_results["spotify"][0]
-    deezer_song = other_results["spotify"][0]
+    deezer_song = other_results["deezer"][0]
 
     ret: list[tuple[Song, float, list[float]]] = []
 
@@ -518,7 +518,7 @@ def order_results(provider: str, results: list[Song], other_results: dict[str, l
 
         time_match = max(100 - non_match_value, 0)
 
-        discard_match = len(re.findall(r"(?i)\d+ h(?:our)\b|\b8d audio\b", result.title)) * -100
+        discard_match = len(re.findall(r"(?i)\d+ h(?:our)\b|\b8d audio\b|\bspee?d up\b", result.title)) * -100
 
         # the average match is rounded for debugging
         average_match = round(

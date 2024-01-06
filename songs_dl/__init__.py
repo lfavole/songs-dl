@@ -10,11 +10,17 @@ import re
 import sys
 import traceback
 import urllib.parse
+from io import BytesIO
 from pprint import pformat
 from typing import Callable, TypedDict
 
 import mutagen.id3
 from yt_dlp.utils import sanitize_filename
+
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
 
 from .deezer import download_deezer
 from .itunes import download_itunes
@@ -127,7 +133,7 @@ def download_song(query: str) -> str | None:
         """
         if mimetype and mimetype.startswith("image/") and len(mimetype) > 6:  # image/...
             return mimetype
-        ext = url.split(".")[-1].replace("jpg", "jpeg")
+        ext = url.rsplit(".", 1)[-1].replace("jpg", "jpeg")
         if ext not in ["jpeg", "png", "gif", "webp"]:
             ext = "jpeg"
         return "image/" + ext
@@ -160,8 +166,16 @@ def download_song(query: str) -> str | None:
                     continue
                 params["type"] = 3
                 params["desc"] = picture.url
-                params["mime"] = get_image_mimetype(mimetype=picture.req.headers.get("Content-Type"), url=picture.url)
-                params["data"] = data
+                try:
+                    img = Image.open(BytesIO(data))
+                    img.thumbnail((1200, 1200))
+                    output = BytesIO()
+                    img.save(output, format="jpeg")
+                    params["mime"] = "image/jpg"
+                    params["data"] = output.getvalue()
+                except OSError:
+                    params["mime"] = get_image_mimetype(mimetype=picture.req.headers.get("Content-Type"), url=picture.url)
+                    params["data"] = data
                 break
         else:
             if tag_name == "COMM":
@@ -191,8 +205,8 @@ def download_song(query: str) -> str | None:
     logger.info("Final filename: %s", final_filename)
 
     if "USLT" in tags_list:
-        with open(final_filename.rsplit(".", 1)[0] + ".lrc", "w") as f:
-            f.write(tags_list["USLT"][0])
+        with open(final_filename.rsplit(".", 1)[0] + ".lrc", "w", encoding="utf-8") as f:
+            f.write(tags_list["USLT"][0] + "\n")
 
     return final_filename
 
