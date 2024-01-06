@@ -22,6 +22,7 @@ dependencies = [
     "mutagen",
     "rapidfuzz",
 	"requests",
+    "tqdm",
     "Unidecode",
     "yt-dlp",
 ]
