@@ -38,7 +38,42 @@ jobs:
 
     - name: Create release
       uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
       with:
         files: dist/*
         name: Release ${{ github.ref }}
-        prerelease: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+  prepare-docs:
+    name: Prepare the documentation
+    needs: build
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Copy the built files into the documentation
+        run: python copy_build_into_docs.py
+
+      - name: Build the documentation
+        run: mkdocs build
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: prepare-docs
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: build/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
