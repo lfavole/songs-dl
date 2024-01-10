@@ -16,7 +16,8 @@ def sizeof_fmt(num, suffix="B"):
     return f"{num:.1f}Yi{suffix}"
 
 
-current_build = sp.check_output("git rev-parse --short HEAD", text=True)
+current_build = sp.check_output(["git", "rev-parse", "--short", "HEAD"], text=True)
+print(f"Current build: {current_build}")
 
 docs = Path(__file__).parent / "docs"
 
@@ -24,6 +25,7 @@ docs = Path(__file__).parent / "docs"
 
 latest_build_folder = docs / "latest-build"
 latest_build_folder.mkdir(exist_ok=True)
+print(f"Latest build folder: {latest_build_folder}")
 
 latest_build_text = """\
 File | Size
@@ -31,9 +33,11 @@ File | Size
 """
 
 for file in (Path(__file__).parent / "dist").iterdir():
+    print(f"Copying {file.name} to latest-build")
     shutil.copy(file, latest_build_folder)
     fname = file.name
     size_formatted = sizeof_fmt(os.path.getsize(file))
     latest_build_text += f"[{fname}](latest-build/{fname}) | {size_formatted}\n"
 
+print("Writing .latest-build.md")
 (docs / ".latest-build.md").write_text(latest_build_text, encoding="utf-8")

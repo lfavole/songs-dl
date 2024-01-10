@@ -40,24 +40,55 @@ jobs:
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')
       with:
-        files: dist/*
+        files: dist/**
         name: Release ${{ github.ref }}
 
-  prepare-docs:
-    name: Prepare the documentation
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-${{ matrix.os }}
+        path: dist/**
+
+  build-docs:
+    name: Build the documentation
     needs: build
 
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: build-*
+          merge-multiple: true
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .[build]
+
       - name: Copy the built files into the documentation
         run: python copy_build_into_docs.py
 
       - name: Build the documentation
         run: mkdocs build
 
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/
+
   deploy:
     name: Deploy to GitHub Pages
-    needs: prepare-docs
+    needs: build-docs
 
     permissions:
       pages: write
@@ -69,11 +100,6 @@ jobs:
 
     runs-on: ubuntu-latest
     steps:
-      - name: Upload GitHub Pages artifact
-        uses: actions/upload-pages-artifact@v1
-        with:
-          path: build/
-
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
