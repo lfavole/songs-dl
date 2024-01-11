@@ -17,11 +17,6 @@ from typing import Callable, TypedDict
 import mutagen.id3
 from yt_dlp.utils import sanitize_filename
 
-try:
-    from PIL import Image
-except ImportError:
-    Image = None
-
 from .deezer import download_deezer
 from .itunes import download_itunes
 from .monkeypatch_requests import mp_requests
@@ -171,13 +166,14 @@ def download_song(query: str) -> str | None:
                 params["type"] = 3
                 params["desc"] = picture.url
                 try:
+                    from PIL import Image
                     img = Image.open(BytesIO(data))
                     img.thumbnail((1200, 1200))
                     output = BytesIO()
                     img.save(output, format="jpeg")
                     params["mime"] = "image/jpg"
                     params["data"] = output.getvalue()
-                except OSError:
+                except (ImportError, OSError):
                     params["mime"] = get_image_mimetype(
                         mimetype=picture.req.headers.get("Content-Type"), url=picture.url
                     )
