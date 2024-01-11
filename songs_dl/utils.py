@@ -5,9 +5,11 @@ import datetime as dt
 import functools
 import logging
 import re
+from io import BytesIO
 from threading import Lock
 from typing import Any, Callable, Literal, Required, Sequence, Type, TypedDict, TypeVar, Union, get_origin, overload
 
+import mutagen.id3
 import requests
 from rapidfuzz import fuzz
 from unidecode import unidecode as unidecode_py
@@ -108,7 +110,7 @@ def get(obj: dict[str, Any] | Sequence[Any], *paths: Any, expected: ExpectedT) -
 
 
 @overload
-def get(obj: dict[str, Any] | Sequence[Any], *paths: Any, expected: None = ...) -> Any:
+def get(obj: Any, *paths: Any, expected: None = ...) -> Any:
     ...
 
 
@@ -190,13 +192,40 @@ class Picture:
 
     CHUNK_SIZE = 64 * 1024
 
-    def __init__(self, url: str, width: int, height: int = 0, sure=True):
+    def __init__(self, url: str = "", width: int = 0, height: int = 0, sure=True, data: Literal[False] | bytes | None = None):
         self.url = url
         self.width = width
         self.height = height or width
-        self.data: Literal[False] | bytes | None = None
+        self.data: Literal[False] | bytes | None = data
         self.sure = sure
         self.req: requests.Response | None = None
+        self._pillow = None
+        self._load_metadata()
+
+    def _load_metadata(self):
+        if self.data:
+            self.sure = True
+            try:
+                from PIL import Image
+
+                img = Image.open(BytesIO(self.data))
+                self._pillow = img
+                self.width, self.height = img.size
+            except (ImportError, OSError):
+                pass
+
+    @property
+    def pillow(self):
+        if self._pillow is not None:
+            return self._pillow
+
+        if not isinstance(self.data, bytes):
+            return None
+
+        from PIL import Image
+
+        self._pillow = Image.open(BytesIO(self.data))
+        return self._pillow
 
     @property
     def size(self):
@@ -299,6 +328,10 @@ class PictureProvider:
     def get_best_picture(self):
         return self.pictures[0]
 
+    @property
+    def pillow(self):
+        return self.get_best_picture().pillow
+
 
 class TagsList(TypedDict, total=False):
     TIT2: Required[str]
@@ -399,7 +432,7 @@ class Song:
             "TIT2": self.title,
             "TPE1": ", ".join(self.artists),
             "TALB": self.album or "",
-            "TLEN": str(self.duration * 1000) if self.duration is not None else "",
+            "TLEN": str(int(self.duration * 1000)) if self.duration is not None else "",
             "TCOM": ", ".join(self.composers) if self.composers else "",
             "TYER": year,
             "TDAT": date,
@@ -423,6 +456,67 @@ class Song:
             "COMM": self.comments or "",
         }
         return ret
+
+    @classmethod
+    def from_id3(cls, file):
+        id3 = mutagen.id3.ID3(file)
+
+        @overload
+        def get_tag(tag: str, integer: Literal[False] = False) -> str:
+            ...
+
+        @overload
+        def get_tag(tag: str, integer: Literal[True] = True) -> int:
+            ...
+
+        def get_tag(tag, integer=False):
+            item = id3.getall(tag)
+            if not item:
+                return ""
+
+            text = item[0].text
+            if not text:
+                return ""
+            if isinstance(text, list):
+                text = text[0]
+
+            if integer:
+                try:
+                    return int(float(text))
+                except ValueError:
+                    return 0
+            return text
+
+        try:
+            date = get_tag("TDAT")
+            year = get_tag("TYER", True)
+            release_date = dt.date(year, int(date[2:4]), int(date[0:2]))
+        except (ValueError, IndexError):
+            release_date = None
+
+        track_n = get_tag("TRCK").split("/")
+        if len(track_n) < 2:
+            track_n.append("")
+        track_n = (int(track_n[0]), int(track_n[1])) if track_n[1] else int(track_n[0]) if track_n[0] else None
+
+        pictures = id3.getall("APIC")
+
+        return Song(
+            title=get_tag("TIT2"),
+            artists=[get_tag("TPE1")],
+            album=get_tag("TALB"),
+            duration=get_tag("TLEN", True),
+            language=get_tag("TLAN"),
+            genre=get_tag("TCON"),
+            composers=[get_tag("TCOM")],
+            release_date=release_date,
+            isrc=get_tag("TSRC"),
+            track_number=track_n,
+            copyright=get_tag("TCOP"),
+            lyrics=get_tag("USLT"),
+            picture=Picture(data=pictures[0].data, url=pictures[0].desc) if pictures else None,
+            comments=get_tag("COMM"),
+        )
 
     def __repr__(self):
         return f"<Song '{self.title}' by {', '.join(self.artists)} album {self.album} {self.duration} s>"
