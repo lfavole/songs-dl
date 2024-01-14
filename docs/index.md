@@ -3,7 +3,7 @@
 Download songs on [YouTube :simple-youtube:{ .youtube }](https://youtube.com){:target="_blank"}
 and add metadata from
 [Deezer :fontawesome-brands-deezer:{ .deezer }](https://deezer.com){:target="_blank"},
-[iTunes ![iTunes icon](https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/ITunes_logo.svg/438px-ITunes_logo.svg.png){ .twemoji .itunes }](https://apple.com/itunes){:target="_blank"},
+[iTunes ![iTunes icon](https://upload.wikimedia.org/wikipedia/commons/d/df/ITunes_logo.svg){ .twemoji .itunes }](https://apple.com/itunes){:target="_blank"},
 [Spotify :simple-spotify:{ .spotify }](https://spotify.com){:target="_blank"},
 and [Musixmatch ![Musixmatch icon](https://upload.wikimedia.org/wikipedia/commons/e/e3/Musixmatch_logo_icon_only.svg){ .twemoji .musixmatch }](https://musixmatch.com){:target="_blank"}.
 
