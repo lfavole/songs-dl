@@ -192,7 +192,14 @@ class Picture:
 
     CHUNK_SIZE = 64 * 1024
 
-    def __init__(self, url: str = "", width: int = 0, height: int = 0, sure=True, data: Literal[False] | bytes | None = None):
+    def __init__(
+        self,
+        url: str = "",
+        width: int = 0,
+        height: int = 0,
+        sure=True,
+        data: Literal[False] | bytes | None = None,
+    ):
         self.url = url
         self.width = width
         self.height = height or width

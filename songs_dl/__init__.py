@@ -167,6 +167,7 @@ def download_song(query: str) -> str | None:
                 params["desc"] = picture.url
                 try:
                     from PIL import Image
+
                     img = Image.open(BytesIO(data))
                     img.thumbnail((1200, 1200))
                     output = BytesIO()
