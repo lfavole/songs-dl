@@ -1,5 +1,6 @@
 ---
 title: Disclaimer
+icon: fontawesome/solid/triangle-exclamation
 ---
 # Disclaimer: this program respects copyright
 
