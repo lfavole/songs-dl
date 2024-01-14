@@ -19,7 +19,9 @@ classifiers = [
 ]
 keywords = ["youtube", "music"]
 dependencies = [
+    "fpdf2",
     "mutagen",
+    "Pillow",
     "rapidfuzz",
 	"requests",
     "tqdm",

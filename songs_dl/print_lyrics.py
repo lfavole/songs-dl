@@ -7,6 +7,7 @@ from pathlib import Path
 from fpdf import FPDF
 from fpdf.enums import XPos, YPos
 from mutagen.id3._util import ID3NoHeaderError
+
 from songs_dl.utils import Song
 
 
