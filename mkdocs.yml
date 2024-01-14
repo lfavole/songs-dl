@@ -1,9 +1,74 @@
+# Project information
 site_name: songs-dl
+site_url: https://lfavole.github.io/songs-dl/
+
+# Repository
+repo_name: lfavole/songs-dl
+repo_url: https://github.com/lfavole/songs-dl
+
 theme:
   name: material
+  icon:
+    logo: material/music-note
+    repo: fontawesome/brands/github
+
+  palette:
+    # Palette toggle for automatic mode
+    - media: "(prefers-color-scheme)"
+      primary: green
+      accent: green
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      primary: green
+      accent: green
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      primary: green
+      accent: green
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+
+  features:
+    - content.code.copy
+    - content.tooltips
+    - navigation.instant
+    - navigation.instant.progress
+    - toc.follow
+
+plugins:
+  - minify:
+      minify_html: true
+      minify_js: true
+      minify_css: true
+      htmlmin_opts:
+          remove_comments: true
+      cache_safe: true
+  - privacy
+  - search
 
 markdown_extensions:
+  - admonition
+  - attr_list
   - markdown_include.include:
       base_path: docs
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+  - pymdownx.superfences
   - toc:
       permalink: True
+
+extra_css:
+  - stylesheets/extra.css

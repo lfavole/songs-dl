@@ -1,0 +1,18 @@
+.md-typeset h1 .headerlink {
+    display: none;
+}
+
+.youtube {
+    color: #ee0f0f;
+}
+.deezer {
+    color: #a238ff;
+}
+.spotify {
+    color: #1ed761;
+}
+.itunes, .musixmatch {
+    user-drag: none;
+    -webkit-user-drag: none;
+    user-select: none;
+}
