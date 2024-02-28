@@ -6,6 +6,9 @@ from tqdm import tqdm
 
 
 def mp_requests():
+    if hasattr(Response.iter_content, "monkeypatched"):
+        return
+
     def iter_content(self, *args, **kwargs):
         pb = tqdm(unit_scale=True, unit="B")
         if "Content-Length" in self.headers:
@@ -14,6 +17,7 @@ def mp_requests():
             pb.update(len(e))
             yield e
         pb.close()
+    iter_content.monkeypatched = True
 
     Response._old_iter_content = Response.iter_content  # type: ignore
     Response.iter_content = iter_content
