@@ -623,7 +623,17 @@ def order_results(provider: str, results: list[Song], other_results: dict[str, l
         discard_match = (
             len(
                 re.findall(
-                    r"(?i)\d+ h(?:our)\b|\b8d audio\b|\bspee?d up\b|\baco?usti|\blive\b|\bdire[ct]ta?\b|\bremix|\bversion|\brecord",
+                    r"""(?xi)
+                    \d+ h(?:our)\b
+                    |\b8d audio\b
+                    |\bspee?d up\b
+                    |\baco?usti
+                    |\blive\b
+                    |\bdire[ct]ta?\b
+                    |\bremix
+                    |\bversion
+                    |\brecord
+                    """,
                     song_title,
                 )
             )

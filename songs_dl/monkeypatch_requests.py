@@ -1,6 +1,7 @@
 """
 Monkeypatch of the requests library to add a progress bar to each request.
 """
+
 from requests.models import Response
 from tqdm import tqdm
 
@@ -17,6 +18,7 @@ def mp_requests():
             pb.update(len(e))
             yield e
         pb.close()
+
     iter_content.monkeypatched = True
 
     Response._old_iter_content = Response.iter_content  # type: ignore
