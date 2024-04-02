@@ -1,3 +1,4 @@
+import importlib.metadata
 import os
 import shutil
 import subprocess as sp
@@ -32,9 +33,13 @@ File | Size
 ---- | ----
 """
 
+version = importlib.metadata.version("songs-dl")
+
 for file in (Path(__file__).parent / "dist").iterdir():
     print(f"Copying {file.name} to latest-build")
-    shutil.copy(file, latest_build_folder)
+    file = Path(shutil.copy(file, latest_build_folder))
+    if f"-{version}" in file.name:
+        file = file.rename(file.parent / file.name.replace(f"-{version}", ""))
     fname = file.name
     size_formatted = sizeof_fmt(os.path.getsize(file))
     latest_build_text += f"[{fname}](latest-build/{fname}) | {size_formatted}\n"
