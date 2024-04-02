@@ -1,6 +1,7 @@
 """
 Utilitary functions.
 """
+
 import datetime as dt
 import functools
 import logging
@@ -76,18 +77,15 @@ def get_base_type(candidate):
 
 
 @overload
-def get(obj: Any, paths: Any, expected: Callable[[Any], ExpectedT]) -> ExpectedT:
-    ...
+def get(obj: Any, paths: Any, expected: Callable[[Any], ExpectedT]) -> ExpectedT: ...
 
 
 @overload
-def get(obj: Any, paths: Any, expected: Type[ExpectedT]) -> ExpectedT:
-    ...
+def get(obj: Any, paths: Any, expected: Type[ExpectedT]) -> ExpectedT: ...
 
 
 @overload
-def get(obj: Any, paths: Any, expected: ExpectedT) -> ExpectedT:
-    ...
+def get(obj: Any, paths: Any, expected: ExpectedT) -> ExpectedT: ...
 
 
 @overload
@@ -95,23 +93,19 @@ def get(
     obj: dict[str, Any] | Sequence[Any],
     *paths: Any,
     expected: Callable[[Any], ExpectedT],
-) -> ExpectedT:
-    ...
+) -> ExpectedT: ...
 
 
 @overload
-def get(obj: dict[str, Any] | Sequence[Any], *paths: Any, expected: Type[ExpectedT]) -> ExpectedT:
-    ...
+def get(obj: dict[str, Any] | Sequence[Any], *paths: Any, expected: Type[ExpectedT]) -> ExpectedT: ...
 
 
 @overload
-def get(obj: dict[str, Any] | Sequence[Any], *paths: Any, expected: ExpectedT) -> ExpectedT:
-    ...
+def get(obj: dict[str, Any] | Sequence[Any], *paths: Any, expected: ExpectedT) -> ExpectedT: ...
 
 
 @overload
-def get(obj: Any, *paths: Any, expected: None = ...) -> Any:
-    ...
+def get(obj: Any, *paths: Any, expected: None = ...) -> Any: ...
 
 
 def get(obj, *paths, expected=None, **kwargs):
@@ -446,18 +440,22 @@ class Song:
             "TIME": time,
             "TSRC": self.isrc or "",
             "TRCK": (
-                "/".join(str(n) for n in self.track_number)
-                if isinstance(self.track_number, tuple)
-                else str(self.track_number)
-            )
-            if self.track_number
-            else "",
+                (
+                    "/".join(str(n) for n in self.track_number)
+                    if isinstance(self.track_number, tuple)
+                    else str(self.track_number)
+                )
+                if self.track_number
+                else ""
+            ),
             "TCOP": self.copyright or "",
             "TLAN": self.language or "",
             "TCON": self.genre or "",
-            "USLT": "\n".join((format_lrc_timestamp(ts) + line if line else "") for line, ts in self.lyrics)
-            if isinstance(self.lyrics, list)
-            else (self.lyrics or ""),
+            "USLT": (
+                "\n".join((format_lrc_timestamp(ts) + line if line else "") for line, ts in self.lyrics)
+                if isinstance(self.lyrics, list)
+                else (self.lyrics or "")
+            ),
             "SYLT": [(line[0], int(line[1] * 1000)) for line in self.lyrics] if isinstance(self.lyrics, list) else [],
             "APIC": self.picture.get_best_picture() if isinstance(self.picture, PictureProvider) else self.picture,
             "COMM": self.comments or "",
@@ -469,12 +467,10 @@ class Song:
         id3 = mutagen.id3.ID3(file)
 
         @overload
-        def get_tag(tag: str, integer: Literal[False] = False) -> str:
-            ...
+        def get_tag(tag: str, integer: Literal[False] = False) -> str: ...
 
         @overload
-        def get_tag(tag: str, integer: Literal[True] = True) -> int:
-            ...
+        def get_tag(tag: str, integer: Literal[True] = True) -> int: ...
 
         def get_tag(tag, integer=False):
             item = id3.getall(tag)
@@ -540,7 +536,7 @@ def _normalize_sentence(string: str):
     """
     Return a sentence without punctuation, without brackets and lowercased.
     """
-    return " ".join(_get_sentence_words(re.sub(r"(?i)\(.*?\)|-.*|feat", "", string)))
+    return " ".join(_get_sentence_words(re.sub(r"(?i)\(.*?\)|-\s+.*|feat", "", string)))
 
 
 def get_provider_name(provider: str):
@@ -562,11 +558,16 @@ def order_results(provider: str, results: list[Song], other_results: dict[str, l
 
     ret: list[tuple[Song, float, list[float]]] = []
 
+    def normalize_title(title: str):
+        return re.sub(r"\bst(e?s?)\.?(\s+|$)", r"saint\1\2", title)
+
     for result in results:
         # check for common word
-        sp_title_words = _get_sentence_words(spotify_song.title)
+        song_title = normalize_title(result.title)
+        sp_title = normalize_title(spotify_song.title)
+        sp_title_words = _get_sentence_words(sp_title)
 
-        if not any(word in _get_sentence_words(result.title) for word in sp_title_words):
+        if not any(word in _get_sentence_words(song_title) for word in sp_title_words):
             # if there are no common words, skip result
             continue
 
@@ -588,8 +589,8 @@ def order_results(provider: str, results: list[Song], other_results: dict[str, l
             continue
 
         name_match = _ratio(
-            str(unidecode(spotify_song.title.lower())),
-            str(unidecode(result.title.lower())),
+            str(unidecode(sp_title.lower())),
+            str(unidecode(song_title.lower())),
             60,
         )
 
@@ -597,7 +598,7 @@ def order_results(provider: str, results: list[Song], other_results: dict[str, l
             len(
                 re.findall(
                     r"(?i)(\b[ou]ffi[cz]i[ae]l|_off\b|\btopic\b)",
-                    result.title + " " + all_r_artists,
+                    song_title + " " + all_r_artists,
                 )
             )
             * 50
@@ -607,7 +608,7 @@ def order_results(provider: str, results: list[Song], other_results: dict[str, l
                 100 if "BADGE_STYLE_TYPE_VERIFIED_ARTIST" in result.youtube_video["badges"] else 0  # type: ignore
             )
         if official_match:
-            official_match += len(re.findall(r"(?i)\baudio\b", result.title)) * 100
+            official_match += len(re.findall(r"(?i)\baudio\b", song_title)) * 100
 
         if deezer_song.copyright:
             copyright_match = 80 + (_normalize_sentence(deezer_song.copyright) in all_r_artists) * 20
@@ -619,12 +620,20 @@ def order_results(provider: str, results: list[Song], other_results: dict[str, l
 
         time_match = max(100 - non_match_value, 0)
 
-        discard_match = len(re.findall(r"(?i)\d+ h(?:our)\b|\b8d audio\b|\bspee?d up\b", result.title)) * -100
+        discard_match = (
+            len(
+                re.findall(
+                    r"(?i)\d+ h(?:our)\b|\b8d audio\b|\bspee?d up\b|\baco?usti|\blive\b|\bdire[ct]ta?\b|\bremix|\bversion|\brecord",
+                    song_title,
+                )
+            )
+            * -100
+        )
 
         # the average match is rounded for debugging
         average_match = round(
             (artist_match + name_match + official_match * 2 + copyright_match * 2 + time_match * 3 + discard_match * 2)
-            / 9,
+            / 11,
             ndigits=3,
         )
 

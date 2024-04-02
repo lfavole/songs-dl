@@ -174,18 +174,18 @@ def download_youtube(song: str, artist: str | None = None, _market: str | None =
 
         artists = []
 
-        if "-" in ret["title"]:
-            parts = ret["title"].split("-", 1)
-            title = parts[1].strip("-").strip()
-            artists.append(parts[0].strip("-").strip())
+        if " - " in ret["title"]:
+            parts = ret["title"].split(" - ", 1)
+            title = parts[1].strip().strip("-").strip()
+            artists.append(parts[0].strip().strip("-").strip())
         else:
             title = ret["title"]
 
         match = re.search(
             r"""(?x)
         ^ (?P<title_first>.*) # first part of title
-        \(? \b f(?:ea)?t \b \.? (?P<artist>.*?) \)? # feat. / ft. with parens
-        (?P<title_second> \( .*)? \)? $ # second part of title (begins with paren), remove trailing ")"
+        [(\[]? \b f(?:ea)?t \b \.? (?P<artist>.*?) [)\]]? # feat. / ft. with parens or brackets
+        (?P<title_second> [(\[] .*)? [)\]]? $ # second part of title (begins with paren), remove trailing ")"
         """,
             title,
         )
