@@ -1,6 +1,6 @@
 import os
-from pathlib import Path
 import re
+from pathlib import Path
 
 url = os.getenv("READTHEDOCS_CANONICAL_URL")
 mkdocs_yml = Path("mkdocs.yml")
