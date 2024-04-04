@@ -9,6 +9,7 @@ build:
       - python -m build
       - python pyinst.py
       - python copy_build_into_docs.py
+      - python fix_readthedocs_canonical_url.py
 
 mkdocs:
   configuration: mkdocs.yml
