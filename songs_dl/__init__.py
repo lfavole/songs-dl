@@ -26,7 +26,7 @@ from .utils import Song, merge_dicts, order_results
 from .youtube import YoutubeSong, download_youtube
 from .youtube_dl import download_youtube_dl
 
-__version__ = "2023.6.9"
+__version__ = "2024.4.4"
 
 logger = logging.getLogger(__name__)
 
