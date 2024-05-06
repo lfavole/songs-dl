@@ -125,7 +125,7 @@ def download_spotify(song: str, artist: str | None = None, market: str | None = 
 
     logger.info("Searching %s on Spotify...", format_query(song, artist, market))
     params = {
-        "q": f"track:{song}" + (f" artist:{artist}" if artist else ""),
+        "q": f"track:{song} artist:{artist}" if artist else song,
         "type": "track",
     }
     if market:
