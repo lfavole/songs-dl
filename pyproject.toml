@@ -86,3 +86,6 @@ include-naming-hint = "y"
 allowed-redefined-builtins = "id"
 good-names = ["f", "i", "id"]
 no-docstring-rgx = "^main$"
+
+[tool.setuptools]
+py-modules = []
