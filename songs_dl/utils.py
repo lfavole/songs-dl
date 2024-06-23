@@ -597,11 +597,11 @@ def order_results(provider: str, results: list[Song], other_results: dict[str, l
         official_match = (
             len(
                 re.findall(
-                    r"(?i)(\b[ou]ffi[cz]i[ae]l|_off\b|\btopic\b)",
+                    r"(?i)(\b[ou]ffi[cz]i[ae]l|_off\b|\btopic\b|audio(?=.*\b[ou]ffi[cz]i[ae]l))",
                     song_title + " " + all_r_artists,
                 )
             )
-            * 50
+            * 100
         )
         if not official_match and hasattr(result, "youtube_video"):
             official_match += (
@@ -633,6 +633,7 @@ def order_results(provider: str, results: list[Song], other_results: dict[str, l
                     |\bremix
                     |\bversion
                     |\brecord
+                    |\d+[./-]\d+[./-]\d+
                     """,
                     song_title,
                 )
@@ -652,7 +653,7 @@ def order_results(provider: str, results: list[Song], other_results: dict[str, l
             (
                 result,
                 average_match,
-                [artist_match, name_match, official_match, copyright_match, time_match],
+                [artist_match, name_match, official_match, copyright_match, time_match, discard_match],
             )
         )
 
