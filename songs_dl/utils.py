@@ -4,11 +4,25 @@ Utilitary functions.
 
 import datetime as dt
 import functools
+import inspect
 import logging
 import re
 from io import BytesIO
 from threading import Lock
-from typing import Any, Callable, Literal, Required, Sequence, Type, TypedDict, TypeVar, Union, get_origin, overload
+from typing import (
+    Any,
+    Callable,
+    Iterable,
+    Literal,
+    Required,
+    Sequence,
+    Type,
+    TypedDict,
+    TypeVar,
+    Union,
+    get_origin,
+    overload,
+)
 
 import mutagen.id3
 import requests
@@ -521,6 +535,27 @@ class Song:
             comments=get_tag("COMM"),
         )
 
+    @classmethod
+    def merge(cls: Type[Self], songs: list[Self]) -> Self:
+        T = TypeVar("T")
+        T2 = TypeVar("T2")
+
+        def get_first(list_: Iterable[T], default: T2 = None) -> T | T2:
+            try:
+                iterator = iter(list_)
+                while True:
+                    item = next(iterator)
+                    if item:
+                        return item
+            except StopIteration:
+                return default
+
+        kwargs = {}
+        for arg, def_value in (inspect.getfullargspec(cls.__init__).kwonlydefaults or {}).items():
+            kwargs[arg] = get_first((getattr(song, arg) for song in songs), def_value)
+
+        return cls(**kwargs)  # type: ignore
+
     def __repr__(self):
         return f"<Song '{self.title}' by {', '.join(self.artists)} album {self.album} {self.duration} s>"
 
@@ -546,28 +581,27 @@ def get_provider_name(provider: str):
     return {"itunes": "iTunes", "youtube": "YouTube"}.get(provider, provider.title())
 
 
-def order_results(provider: str, results: list[Song], other_results: dict[str, list[Song]] | None):
+def order_results(provider: str, best_items: list[Song], results: dict[str, list[Song]] | None):
     """
     Order the results: choose the result that is the most similar to the Spotify / Deezer song.
     """
-    if not other_results:
-        return results
+    if not results:
+        return best_items
 
-    spotify_song = other_results["spotify"][0]
-    deezer_song = other_results["deezer"][0]
+    best_item = Song.merge(best_items)
 
     ret: list[tuple[Song, float, list[float]]] = []
 
     def normalize_title(title: str):
         return re.sub(r"\bst(e?s?)\.?(\s+|$)", r"saint\1\2", title)
 
-    for result in results:
+    for result in results[provider]:
         # check for common word
         song_title = normalize_title(result.title)
-        sp_title = normalize_title(spotify_song.title)
-        sp_title_words = _get_sentence_words(sp_title)
+        best_title = normalize_title(best_item.title)
+        best_title_words = _get_sentence_words(best_title)
 
-        if not any(word in _get_sentence_words(song_title) for word in sp_title_words):
+        if not any(word in _get_sentence_words(song_title) for word in best_title_words):
             # if there are no common words, skip result
             continue
 
@@ -579,17 +613,17 @@ def order_results(provider: str, results: list[Song], other_results: dict[str, l
 
         artist_match_number = sum(
             1 if _partial_ratio(_normalize_sentence(sp_artist), all_r_artists, 85) else 0
-            for sp_artist in spotify_song.artists
+            for sp_artist in best_item.artists
         )
 
-        artist_match = (artist_match_number / len(spotify_song.artists)) * 100
+        artist_match = (artist_match_number / len(best_item.artists)) * 100
 
         # Skip if there are no artists in common
         if artist_match_number == 0:
             continue
 
         name_match = _ratio(
-            str(unidecode(sp_title.lower())),
+            str(unidecode(best_title.lower())),
             str(unidecode(song_title.lower())),
             60,
         )
@@ -610,13 +644,13 @@ def order_results(provider: str, results: list[Song], other_results: dict[str, l
         if official_match:
             official_match += len(re.findall(r"(?i)\baudio\b", song_title)) * 100
 
-        if deezer_song.copyright:
-            copyright_match = 80 + (_normalize_sentence(deezer_song.copyright) in all_r_artists) * 20
+        if best_item.copyright:
+            copyright_match = 80 + (_normalize_sentence(best_item.copyright) in all_r_artists) * 20
         else:
             copyright_match = 100
 
-        delta = max(abs(result.duration - spotify_song.duration) - 4, 0)
-        non_match_value = delta**2 / spotify_song.duration * 100
+        delta = max(abs(result.duration - best_item.duration) - 4, 0)
+        non_match_value = delta**2 / best_item.duration * 100
 
         time_match = max(100 - non_match_value, 0)
 

@@ -76,32 +76,44 @@ def download_song(query: str) -> str | None:
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         future_to_action = {executor.submit(func, song, artist, market): action for action, func in actions.items()}
         for future in concurrent.futures.as_completed(future_to_action):
-            action = future_to_action[future]
+            provider = future_to_action[future]
             try:
-                results[action] = future.result()
+                results[provider] = future.result()
             except:  # noqa
-                print(f"Error when executing {action}:", file=sys.stderr)
+                print(f"Error when executing {provider}:", file=sys.stderr)
                 traceback.print_exc()
-            if action == "youtube" and len(results[action]) == 0:
+            if provider == "youtube" and len(results[provider]) == 0:
                 logger.error("No videos available!")
                 for future in future_to_action:
                     future.cancel()
                 return None
 
     # be sure there is at least one song in every list
-    for action, songs in results.items():
+    for provider, songs in results.items():
         if len(songs) == 0:
             songs.append(Song.empty())
 
+    # Providers sorted by confidence
+    best_providers = ["spotify", "itunes", "musixmatch", "deezer", "youtube"]
+
+    def get_best_songs(not_provider):
+        return [
+            item[1]
+            for item in sorted(
+                [(action, songs[0]) for action, songs in results.items() if action != not_provider],
+                key=lambda item: best_providers.index(item[0]),
+            )
+        ]
+
     # order the results
-    for action, songs in results.items():
-        if action != "spotify":
-            results[action] = order_results(action, songs, results)
-        if len(results[action]) == 0:
-            if action == "youtube":
+    for provider, songs in results.items():
+        if provider != "spotify":
+            results[provider] = order_results(provider, get_best_songs(provider), results)
+        if len(results[provider]) == 0:
+            if provider == "youtube":
                 logger.error("No videos available!")
                 return None
-            results[action].append(Song.empty())
+            results[provider].append(Song.empty())
 
     best_video: YoutubeSong = results["youtube"][0]  # type: ignore
 
