@@ -21,7 +21,7 @@ To install the latest changes:
 <details>
 <summary>Publishing the release on PyPI (only for the admin!)</summary>
 
-## Building
+## Building (no more needed, done by GitHub Actions)
 
 	python -m install -e .[build]
 	python -m build
