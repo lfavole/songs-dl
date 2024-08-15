@@ -44,7 +44,7 @@ requires-python = ">=3.7"
 [tool.bumpver]
 current_version = "2024.4.4"
 version_pattern = "YYYY.MM.DD"
-commit_message = "Release {new_version}"
+commit_message = "chore: Release {new_version}"
 commit = true
 tag = true
 push = true
