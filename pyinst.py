@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 
 from PyInstaller.__main__ import run
@@ -21,11 +22,13 @@ for excl in exclusions:
     exclusions_args.append("--exclude-module")
     exclusions_args.append(excl)
 
+system_suffix = "windows" if sys.platform == "win32" else "macos" if sys.platform == "darwin" else "linux"
+
 run(
     [
         "--onefile",
         "--name",
-        "songs-dl",
+        "songs-dl-" + system_suffix,
         *exclusions_args,
         str(BASE_PATH / "songs_dl/__main__.py"),
     ]
