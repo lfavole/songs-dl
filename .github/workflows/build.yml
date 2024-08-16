@@ -112,6 +112,7 @@ jobs:
   build-docs:
     name: Build the documentation
     needs: build
+    if: github.ref_type != 'tag'
 
     runs-on: ubuntu-latest
     steps:
