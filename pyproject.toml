@@ -87,5 +87,6 @@ allowed-redefined-builtins = "id"
 good-names = ["f", "i", "id"]
 no-docstring-rgx = "^main$"
 
-[tool.setuptools]
-py-modules = []
+[tool.setuptools.packages.find]
+include = ["songs_dl*"]
+namespaces = false
