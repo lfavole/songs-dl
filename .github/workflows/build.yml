@@ -22,6 +22,7 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version-file: pyproject.toml
+        cache: pip
 
     - name: Install dependencies
       run: |
@@ -120,6 +121,14 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version-file: pyproject.toml
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: docs-pip-${{ hashFiles('**/pyproject.toml') }}
+        restore-keys: |
+          docs-pip-
 
     - name: Download artifacts
       uses: actions/download-artifact@v4
