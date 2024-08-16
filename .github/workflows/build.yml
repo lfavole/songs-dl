@@ -34,6 +34,7 @@ jobs:
         python pyinst.py
 
     - name: Build package
+      if: matrix.os == 'ubuntu-latest'
       run: |
         python -m build
 
