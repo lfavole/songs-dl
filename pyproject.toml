@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "songs-dl"
-version = "2024.8.15"
+version = "2024.8.16"
 description = "Download songs on YouTube and add metadata."
 readme = "README.md"
 authors = [{ name = "Laurent FAVOLE", email = "laurentfavole03@gmail.com" }]
@@ -42,7 +42,7 @@ requires-python = ">=3.7"
 	songs-dl = "songs_dl.__main__:main"
 
 [tool.bumpver]
-current_version = "2024.8.15"
+current_version = "2024.8.16"
 version_pattern = "YYYY.MM.DD"
 commit_message = "chore: Release {new_version}"
 commit = true
