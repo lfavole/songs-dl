@@ -594,7 +594,9 @@ def order_results(provider: str, best_items: list[Song], results: dict[str, list
     ret: list[tuple[Song, float, list[float]]] = []
 
     def normalize_title(title: str):
-        return re.sub(r"\bst(e?s?)\.?(\s+|$)", r"saint\1\2", title)
+        title = re.sub(r"\.\s*(?=\w\W|\w$|$)", "", title)
+        title = re.sub(r"\bst(e?s?)(\s+|$)", r"saint\1\2", title)
+        return title
 
     for result in results[provider]:
         # check for common word
