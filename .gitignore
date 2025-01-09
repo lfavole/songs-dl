@@ -107,5 +107,8 @@ venv.bak/
 *.webm
 *.mp3
 
+# lyric files
+*.lrc
+
 # lyrics pages
 *.pdf

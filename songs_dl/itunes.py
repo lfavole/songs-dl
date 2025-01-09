@@ -31,7 +31,7 @@ def download_itunes(song: str, artist: str | None = None, market: str | None = N
     """
     logger.info("Searching %s on iTunes...", format_query(song, artist, market))
     if artist:
-        query = song + " " + artist
+        query = f"{song} {artist}"
     else:
         query = song
     params = {"term": query, "entity": "song"}

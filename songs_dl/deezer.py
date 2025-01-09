@@ -231,7 +231,7 @@ def download_deezer(song: str, artist: str | None = None, _market: str | None = 
     """
     logger.info("Searching %s on Deezer...", format_query(song, artist))
     if artist:
-        query = f'title:"{song}" artist:"{artist}"'
+        query = f"{song} {artist}"
     else:
         query = song
     req = locked(deezer_lock)(requests.get)("https://api.deezer.com/search/track", params={"q": query})

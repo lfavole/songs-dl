@@ -44,7 +44,7 @@ def merge_dicts(
     """
     Merge many dicts and return a dict with arrays containing all values.
 
-    `merge_list` :
+    `merge_lists` is used to determine how to merge the lists:
     - `True` -> all the elements must be lists (list/tuple) and are concatenated
     - `False` -> all the elements are added as is
     - `None` -> `True` for the element that are lists and `False` for the other elements
@@ -140,7 +140,7 @@ def get(obj, *paths, expected=None, **kwargs):
     ret = traverse_obj(
         obj,
         *paths,
-        expected_type=lambda val: expected(val) if expected else None,  # pylint: disable=W0108
+        expected_type=expected,
         **kwargs,
     )
     if ret is None and expected:
@@ -329,13 +329,14 @@ class PictureProvider:
         """
         Return a probably valid URL for the given size.
         """
-        first = self.pictures[0]
-        first_size = first.size
-        picture = first.url
+        for picture in self.pictures:
+            picture_size = picture.size
+            picture_url = picture.url
 
-        url_parts = picture.split("/")
-        url_parts[-1] = url_parts[-1].replace(str(first_size), str(size))
-        return "/".join(url_parts)
+            url_parts = picture_url.split("/")
+            if str(picture_size) in url_parts[-1]:
+                url_parts[-1] = url_parts[-1].replace(str(picture_size), str(size))
+                return "/".join(url_parts)
 
     def get_pictures(self):
         return self.pictures
