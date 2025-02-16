@@ -9,15 +9,6 @@ on:
 jobs:
   linting:
     name: Linting
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-        - {name: black, command: black . --check}
-        - {name: flake8, command: flake8 .}
-        - {name: isort, command: isort . --check}
-        - {name: pylint, command: 'pylint */**.py --evaluation "0 if fatal else max(0, 10 - error - warning)"'}
-
     runs-on: ubuntu-latest
     env:
       UV_CACHE_DIR: .uv-cache
@@ -43,5 +34,8 @@ jobs:
     - name: Install dependencies
       run: uv sync --extra dev
 
-    - name: Run ${{ matrix.name }}
-      run: python -m ${{ matrix.command }}
+    - name: Run ruff check
+      run: uv run ruff check --output-format github .
+
+    - name: Run ruff format --check
+      run: uv run ruff format --check .

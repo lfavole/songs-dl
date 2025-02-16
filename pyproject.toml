@@ -31,7 +31,7 @@ requires-python = ">=3.7"
 
 	[project.optional-dependencies]
 	build = ["build", "pyinstaller", "twine"]
-	dev = ["black", "bumpver", "flake8", "isort", "pylint"]
+	dev = ["bumpver", "ruff"]
     docs = ["markdown-include", "mkdocs", "mkdocs-material", "mkdocs-minify-plugin"]
     lyrics = ["fpdf2"]
 
@@ -56,37 +56,13 @@ push = true
 ]
 "songs_dl/__init__.py" = ["{version}"]
 
-[tool.black]
+[tool.ruff]
 line-length = 120
 
-[tool.isort]
-profile = "black"
-line_length = 120
-skip = "migrations"
+[tool.ruff.lint]
+preview = true
+select = ["ALL"]
+ignore = ["COM812", "CPY", "D203", "D212", "DOC201", "DOC402", "DTZ", "EXE", "FBT", "FIX", "S310", "T", "TD002", "TD003"]
 
-[tool.pylint.main]
-jobs = 0
-disable = [
-    "bad-indentation",
-    "bare-except",
-    "fixme",
-    "global-statement",
-    "import-outside-toplevel",
-    "invalid-str-returned",
-    "line-too-long",
-    "missing-module-docstring",
-    "missing-timeout",
-    "no-member",
-    "protected-access",
-    "unspecified-encoding",
-]
-include-naming-hint = "y"
-
-[tool.pylint.basic]
-allowed-redefined-builtins = "id"
-good-names = ["f", "i", "id"]
-no-docstring-rgx = "^main$"
-
-[tool.setuptools.packages.find]
-include = ["songs_dl*"]
-namespaces = false
+[tool.ruff.format]
+preview = true
