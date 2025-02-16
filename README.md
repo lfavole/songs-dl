@@ -6,11 +6,19 @@ Download songs on YouTube and add metadata from Deezer, iTunes and Spotify.
 
 To install the latest release from PyPI:
 
+    # with pip
 	pip install songs-dl
+
+    # with uv
+    uv tool install songs-dl
 
 To install the latest changes:
 
-	pip install git+https://github.com/lfavole/songs-dl.git
+	# with pip
+    pip install git+https://github.com/lfavole/songs-dl.git
+
+    # with uv
+    uv tool install git+https://github.com/lfavole/songs-dl.git
 
 ## Examples
 
@@ -23,13 +31,12 @@ To install the latest changes:
 
 ## Building (no more needed, done by GitHub Actions)
 
-	python -m install -e .[build]
-	python -m build
-	twine check dist/*
-	twine upload dist/* [--repository testpypi]
+	uv sync --extra build
+	uv build
+	uv publish [--index testpypi]
 
 ## Bumping the version
 
-	python -m install -e .[dev]
-    bumpver update
+	uv sync --extra dev
+    uv run bumpver update
 </details>

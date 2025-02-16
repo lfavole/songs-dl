@@ -18,25 +18,28 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
+    - name: Install uv on macOS/Linux
+      run: curl -LsSf https://github.com/astral-sh/uv/releases/latest/download/uv-installer.sh | sh
+      if: runner.os != 'windows'
+
+    - name: Install uv on Windows
+      run: irm https://github.com/astral-sh/uv/releases/latest/download/uv-installer.ps1 | iex
+      if: runner.os == 'windows'
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version-file: pyproject.toml
-        cache: pip
 
     - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install -e .[build]
+      run: uv sync --extra build
 
     - name: Build executable
-      run: |
-        python pyinst.py
+      run: uv run pyinst.py
 
     - name: Build package
       if: matrix.os == 'ubuntu-latest'
-      run: |
-        python -m build
+      run: uv build
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
@@ -113,11 +116,16 @@ jobs:
     name: Build the documentation
     needs: build
     if: github.ref_type != 'tag'
+    env:
+      UV_CACHE_DIR: .uv-cache
 
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+
+    - name: Install uv
+      run: curl -LsSf https://github.com/astral-sh/uv/releases/latest/download/uv-installer.sh | sh
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -127,10 +135,9 @@ jobs:
     - name: Cache pip dependencies
       uses: actions/cache@v4
       with:
-        path: ~/.cache/pip
-        key: docs-pip-${{ hashFiles('**/pyproject.toml') }}
-        restore-keys: |
-          docs-pip-
+        path: ${{ env.UV_CACHE_DIR }}
+        key: uv-docs-${{ hashFiles('**/pyproject.toml') }}
+        restore-keys: uv-docs-
 
     - name: Download artifacts
       uses: actions/download-artifact@v4
@@ -140,15 +147,13 @@ jobs:
         merge-multiple: true
 
     - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install -e .[docs]
+      run: uv sync --extra docs
 
     - name: Copy the built files into the documentation
-      run: python copy_build_into_docs.py
+      run: uv run copy_build_into_docs.py
 
     - name: Build the documentation
-      run: mkdocs build
+      run: uv run mkdocs build
 
     - name: Upload GitHub Pages artifact
       uses: actions/upload-pages-artifact@v3
