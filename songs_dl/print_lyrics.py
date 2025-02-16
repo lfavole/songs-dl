@@ -4,8 +4,12 @@ import sys
 from glob import glob
 from pathlib import Path
 
-from fpdf import FPDF
-from fpdf.enums import XPos, YPos
+try:
+    from fpdf import FPDF
+    from fpdf.enums import XPos, YPos
+except ModuleNotFoundError as err:
+    msg = "The fpdf2 module was not found. Please reinstall songs-dl with pip install songs-dl[lyrics]."
+    raise ModuleNotFoundError(msg) from err
 from mutagen.id3._util import ID3NoHeaderError
 
 from songs_dl.utils import Song

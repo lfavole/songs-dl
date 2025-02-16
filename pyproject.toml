@@ -19,7 +19,6 @@ classifiers = [
 ]
 keywords = ["youtube", "music"]
 dependencies = [
-    "fpdf2",
     "mutagen",
     "Pillow",
     "rapidfuzz",
@@ -34,6 +33,7 @@ requires-python = ">=3.7"
 	build = ["build", "pyinstaller", "twine"]
 	dev = ["black", "bumpver", "flake8", "isort", "pylint"]
     docs = ["markdown-include", "mkdocs", "mkdocs-material", "mkdocs-minify-plugin"]
+    lyrics = ["fpdf2"]
 
 	[project.urls]
 	Homepage = "https://github.com/lfavole/songs-dl"
