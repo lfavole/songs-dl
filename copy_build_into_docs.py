@@ -1,8 +1,9 @@
-import importlib.metadata
 import os
 import shutil
 import subprocess as sp
 from pathlib import Path
+
+import songs_dl
 
 
 # https://stackoverflow.com/a/1094933
@@ -33,7 +34,7 @@ File | Size
 ---- | ----
 """
 
-version = importlib.metadata.version("songs-dl")
+version = songs_dl.__version__
 
 for file in (Path(__file__).parent / "dist").iterdir():
     print(f"Copying {file.name} to latest-build")
