@@ -27,22 +27,19 @@ def download_youtube_dl(url: str):
 
     logger.info("Downloading YouTube video '%s'...", url)
 
-    # name = f"{int(str(random.random())[2:]):x}"
-    with YoutubeDL(
-        {
-            "outtmpl": "%(title)s.%(ext)s",
-            "format": "bestaudio",
-            "retries": float("inf"),
-            "postprocessors": [
-                {
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": "mp3",
-                    "preferredquality": "128",
-                }
-            ],
-            "progress_hooks": [progress_hook],
-        }
-    ) as ydl:
+    with YoutubeDL({
+        "outtmpl": "%(title)s.%(ext)s",
+        "format": "bestaudio",
+        "retries": float("inf"),
+        "postprocessors": [
+            {
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+                "preferredquality": "128",
+            }
+        ],
+        "progress_hooks": [progress_hook],
+    }) as ydl:
         ydl.download([url])
 
     return filename[: -len(filename.rsplit(".", maxsplit=1)[-1])] + "mp3", Song(

@@ -24,12 +24,10 @@ for excl in exclusions:
 
 system_suffix = "windows" if sys.platform == "win32" else "macos" if sys.platform == "darwin" else "linux"
 
-run(
-    [
-        "--onefile",
-        "--name",
-        "songs-dl-" + system_suffix,
-        *exclusions_args,
-        str(BASE_PATH / "songs_dl/__main__.py"),
-    ]
-)
+run([
+    "--onefile",
+    "--name",
+    "songs-dl-" + system_suffix,
+    *exclusions_args,
+    str(BASE_PATH / "songs_dl/__main__.py"),
+])

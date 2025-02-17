@@ -40,7 +40,10 @@ def get_access_token(tries: int = 3):
 
     if not ACCESS_TOKEN_EXPIRATION or ACCESS_TOKEN_EXPIRATION < time():
         logger.info("Getting Musixmatch access token...")
-        req = locked(musixmatch_lock)(requests.get)("https://apic-desktop.musixmatch.com/ws/1.1/token.get", {"app_id": "web-desktop-app-v1.0", "user_language": "en"})
+        req = locked(musixmatch_lock)(requests.get)(
+            "https://apic-desktop.musixmatch.com/ws/1.1/token.get",
+            {"app_id": "web-desktop-app-v1.0", "user_language": "en"},
+        )
         req.raise_for_status()
 
         try:
@@ -69,14 +72,20 @@ def get_access_token(tries: int = 3):
 
 
 def get_api(url, params=None, headers=None, *args, **kwargs):
-    resp = locked(musixmatch_lock)(requests.get)("https://apic-desktop.musixmatch.com/ws/1.1/" + url, {
-        **(params or {}),
-        "app_id": "web-desktop-app-v1.0",
-        "usertoken": get_access_token(),
-    }, headers={
-        **(headers or {}),
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.183 Safari/537.36",
-    }, *args, **kwargs)
+    resp = locked(musixmatch_lock)(requests.get)(
+        "https://apic-desktop.musixmatch.com/ws/1.1/" + url,
+        {
+            **(params or {}),
+            "app_id": "web-desktop-app-v1.0",
+            "usertoken": get_access_token(),
+        },
+        headers={
+            **(headers or {}),
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.183 Safari/537.36",
+        },
+        *args,
+        **kwargs,
+    )
     resp.raise_for_status()
     data = resp.json()
     status_code = get(data, ("message", "header", "status_code"), int)
@@ -90,7 +99,7 @@ def format_time(time_in_seconds: float):
     """Returns a [mm:ss.xx] formatted string from the given time in seconds."""
     time = datetime.timedelta(seconds=time_in_seconds)
     minutes, seconds = divmod(time.seconds, 60)
-    return f"{minutes:02}:{seconds:02}.{time.microseconds//10000:02}"
+    return f"{minutes:02}:{seconds:02}.{time.microseconds // 10000:02}"
 
 
 def get_lyrics(track_id: int):

@@ -686,13 +686,11 @@ def order_results(provider: str, best_items: list[Song], results: dict[str, list
         )
 
         # the results along with the average match
-        ret.append(
-            (
-                result,
-                average_match,
-                [artist_match, name_match, official_match, copyright_match, time_match, discard_match],
-            )
-        )
+        ret.append((
+            result,
+            average_match,
+            [artist_match, name_match, official_match, copyright_match, time_match, discard_match],
+        ))
 
     ret = sorted(ret, key=lambda el: el[1], reverse=True)
     logger.debug(
