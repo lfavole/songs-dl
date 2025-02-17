@@ -70,3 +70,7 @@ ignore = ["COM812", "CPY", "D203", "D212", "DOC201", "DOC402", "DTZ", "EXE", "FB
 
 [tool.ruff.format]
 preview = true
+
+[tool.setuptools]
+license-files = []
+py-modules = []
