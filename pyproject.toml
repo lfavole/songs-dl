@@ -15,6 +15,7 @@ classifiers = [
 ]
 keywords = ["youtube", "music"]
 dependencies = [
+    "bump-my-version",
     "mutagen",
     "Pillow",
     "rapidfuzz",
@@ -37,20 +38,27 @@ Homepage = "https://github.com/lfavole/songs-dl"
 [project.scripts]
 songs-dl = "songs_dl.__main__:main"
 
-[tool.bumpver]
+[tool.bumpversion]
 current_version = "2024.8.16"
-version_pattern = "YYYY.MM.DD"
-commit_message = "chore: Release {new_version}"
+message = "chore: Release {new_version}"
 commit = true
+search = "{current_version}"
+replace = "{new_version}"
+regex = false
+sign_tags = true
 tag = true
-push = true
+tag_name = "{new_version}"
+tag_message = "{new_version}"
 
-[tool.bumpver.file_patterns]
-"pyproject.toml" = [
-    'current_version = "{version}"',
-    'version = "{version}"',
-]
-"songs_dl/__init__.py" = ["{version}"]
+[[tool.bumpversion.files]]
+filename = "pyproject.toml"
+search = "version = \"{current_version}\""
+replace = "version = \"{new_version}\""
+
+[[tool.bumpversion.files]]
+filename = "songs_dl/__init__.py"
+search = "__version__ = \"{current_version}\""
+replace = "__version__ = \"{new_version}\""
 
 [tool.ruff]
 line-length = 120
