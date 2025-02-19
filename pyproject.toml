@@ -15,7 +15,6 @@ classifiers = [
 ]
 keywords = ["youtube", "music"]
 dependencies = [
-    "bump-my-version",
     "mutagen",
     "Pillow",
     "rapidfuzz",
@@ -28,7 +27,7 @@ requires-python = ">=3.7"
 
 [project.optional-dependencies]
 build = ["pyinstaller"]
-dev = ["bumpver", "ruff"]
+dev = ["bump-my-version", "ruff"]
 docs = ["markdown-include", "mkdocs", "mkdocs-material", "mkdocs-minify-plugin"]
 lyrics = ["fpdf2"]
 
