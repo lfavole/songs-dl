@@ -1,6 +1,6 @@
 [project]
 name = "songs-dl"
-version = "0.2.1"
+version = "0.2.2"
 description = "Download songs on YouTube and add metadata."
 readme = "README.md"
 authors = [{ name = "Laurent FAVOLE", email = "laurentfavole03@gmail.com" }]
@@ -38,7 +38,7 @@ Homepage = "https://github.com/lfavole/songs-dl"
 songs-dl = "songs_dl.__main__:main"
 
 [tool.bumpversion]
-current_version = "0.2.1"
+current_version = "0.2.2"
 message = "chore: Release {new_version}"
 commit = true
 search = "{current_version}"
