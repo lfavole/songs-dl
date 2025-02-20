@@ -72,4 +72,4 @@ preview = true
 
 [tool.setuptools]
 license-files = []
-py-modules = []
+packages = ["songs_dl"]
