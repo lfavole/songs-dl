@@ -1,0 +1,33 @@
+name: Core bug report
+description: Report a bug unrelated to any particular song
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > [!IMPORTANT]
+        > Not providing the required (*) information or removing the template will result in your issue being closed and ignored.
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      description: Please read carefully all the points of this check list.
+      options:
+        - label: I'm reporting a bug unrelated to a specific song
+          required: true
+        - label: I've verified that I have **updated songs-dl to master** ([installed the latest changes](https://github.com/lfavole/songs-dl#installation))
+          required: true
+        - label: I've searched the [bugtracker](https://github.com/lfavole/songs-dl/issues?q=is%3Aissue) for similar issues **including closed ones**. DO NOT post duplicates
+          required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Provide a description that is worded well enough to be understood
+      placeholder: Provide any additional information, any suggested solutions, and as much context and examples as possible
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Provide output that clearly demonstrates the problem
+      render: shell

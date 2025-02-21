@@ -1,0 +1,52 @@
+name: Song download issue
+description: Report that a song isn't downloaded correctly.
+labels: ["song issue"]
+body:
+  - type: input
+    id: song
+    attributes:
+      label: Song
+      description: Enter the title of the song that you are trying to download
+      placeholder: Shake It Off
+  - type: input
+    id: artist
+    attributes:
+      label: Artist
+      description: Enter the artist of the song (e.g. the singer)
+      placeholder: Taylor Swift
+  - type: markdown
+    attributes:
+      value: |
+        > [!IMPORTANT]
+        > Not providing the required (*) information or removing the template will result in your issue being closed and ignored.
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      description: Please read carefully all the points of this check list.
+      options:
+        - label: The title is correct (regardless of case)
+          required: true
+        - label: The artist is correct, i.e. all the artists are present (regardless of case)
+          required: true
+        - label: I tried using the `title -- artist` syntax but it is not working
+          required: true
+        - label: The song is available on YouTube
+          required: true
+  - type: input
+    id: region
+    attributes:
+      label: Region
+      description: Enter the country/region you are in
+      placeholder: France
+  - type: textarea
+    id: description
+    attributes:
+      label: Provide any additional information and suggested solutions
+  - type: textarea
+    id: log
+    attributes:
+      label: Provide the output of the `songs-dl` command
+      render: shell
+    validations:
+      required: true
