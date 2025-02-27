@@ -6,6 +6,7 @@ import datetime as dt
 import functools
 import inspect
 import logging
+import math
 import re
 from io import BytesIO
 from threading import Lock
@@ -582,6 +583,27 @@ def get_provider_name(provider: str):
     return {"itunes": "iTunes", "youtube": "YouTube"}.get(provider, provider.title())
 
 
+DISCARD_RE = re.compile(
+    r"""(?xi)
+    \d+ h(?:our)?s?\b
+    |\bloops?\b
+    |\bbest\W*of\b
+    |\bfull\b
+    |\bcompl[eè]t
+    |\bnon\W*stop\b
+    |\b8d audio\b
+    |\bspee?d up\b
+    |\baco?usti
+    |\blive\b
+    |\bdire[ct]ta?\b
+    |\bremix
+    |\bversion
+    |\brecord
+    |\d+[./-]\d+[./-]\d+
+    """,
+)
+
+
 def order_results(provider: str, best_items: list[Song], results: dict[str, list[Song]] | None):
     """
     Order the results: choose the result that is the most similar to the Spotify / Deezer song.
@@ -657,31 +679,21 @@ def order_results(provider: str, best_items: list[Song], results: dict[str, list
 
         time_match = max(100 - non_match_value, 0)
 
-        discard_match = (
-            len(
-                re.findall(
-                    r"""(?xi)
-                    \d+ h(?:our)\b
-                    |\b8d audio\b
-                    |\bspee?d up\b
-                    |\baco?usti
-                    |\blive\b
-                    |\bdire[ct]ta?\b
-                    |\bremix
-                    |\bversion
-                    |\brecord
-                    |\d+[./-]\d+[./-]\d+
-                    """,
-                    song_title,
-                )
-            )
-            * -100
-        )
+        views_match = math.log10(result.youtube_video["views"]) / 10 * 100 if hasattr(result, "youtube_video") else 50
+
+        discard_match = (len(DISCARD_RE.findall(song_title)) + len(DISCARD_RE.findall(all_r_artists))) * -100
 
         # the average match is rounded for debugging
         average_match = round(
-            (artist_match + name_match + official_match * 2 + copyright_match * 2 + time_match * 3 + discard_match * 2)
-            / 11,
+            (
+                artist_match
+                + name_match
+                + official_match * 2
+                + copyright_match * 2
+                + time_match * 3
+                + views_match
+                + discard_match * 2
+            ) / 12,
             ndigits=3,
         )
 
@@ -689,7 +701,7 @@ def order_results(provider: str, best_items: list[Song], results: dict[str, list
         ret.append((
             result,
             average_match,
-            [artist_match, name_match, official_match, copyright_match, time_match, discard_match],
+            [artist_match, name_match, official_match, copyright_match, time_match, views_match, discard_match],
         ))
 
     ret = sorted(ret, key=lambda el: el[1], reverse=True)
