@@ -1,3 +1,5 @@
+"""Functions to get metadata from Spotify."""
+
 import logging
 from pprint import pformat
 from threading import Lock
@@ -13,39 +15,43 @@ spotify_lock = Lock()
 
 
 class SpotifyAccessToken(TypedDict):
-    """
-    Spotify access token (on Spotify).
-    """
+    """Spotify access token."""
 
     accessToken: str
     accessTokenExpirationTimestampMs: int
 
 
 class AccessToken(TypedDict):
-    """
-    Spotify access token for the `get_access_token` function
-    """
+    """Spotify access token for the `get_access_token` function."""
 
     token: str
     expiration: int
 
 
 class SpotifyArtist(TypedDict):
+    """An artist on Spotify."""
+
     name: str
 
 
 class SpotifyImage(TypedDict):
+    """An image on Spotify."""
+
     width: int
     height: int
     url: str
 
 
 class SpotifyAlbum(TypedDict):
+    """An album on Spotify."""
+
     name: str
     images: list[SpotifyImage]
 
 
 class SpotifyTrack(TypedDict):
+    """A track on Spotify."""
+
     name: str
     artists: list[SpotifyArtist]
     album: SpotifyAlbum
@@ -53,10 +59,14 @@ class SpotifyTrack(TypedDict):
 
 
 class SpotifyTracks(TypedDict):
+    """A list of tracks on Spotify."""
+
     items: list[SpotifyTrack]
 
 
 class SpotifyData(TypedDict):
+    """Data provided by Spotify."""
+
     tracks: SpotifyTracks
 
 
@@ -64,13 +74,11 @@ ACCESS_TOKEN = ""
 ACCESS_TOKEN_EXPIRATION = 0
 
 
-def get_access_token():
-    """
-    Get the Spofity access token
-    """
-    global ACCESS_TOKEN, ACCESS_TOKEN_EXPIRATION
+def get_access_token() -> str:
+    """Get the Spofity access token."""
+    global ACCESS_TOKEN, ACCESS_TOKEN_EXPIRATION  # noqa: PLW0603
     # we don't need "global" statement (we edit the keys)
-    if not ACCESS_TOKEN_EXPIRATION or ACCESS_TOKEN_EXPIRATION < time():
+    if not ACCESS_TOKEN_EXPIRATION or time() > ACCESS_TOKEN_EXPIRATION:
         logger.info("Getting Spotify access token...")
         req = locked(spotify_lock)(requests.get)("https://open.spotify.com/get_access_token")
 
@@ -95,12 +103,10 @@ def get_access_token():
 
 
 class SpotifyPictureProvider(PictureProvider):
-    """
-    Picture provider for Spotify.
-    """
+    """Picture provider for Spotify."""
 
-    def get_sure_pictures(self, result):
-        pictures = get(result, ("album", "images"), list)
+    def get_sure_pictures(self) -> list[Picture]:  # noqa: D102
+        pictures = get(self.result, ("album", "images"), list)
         return [
             Picture(
                 get(picture, "url", str),
@@ -110,14 +116,12 @@ class SpotifyPictureProvider(PictureProvider):
             for picture in pictures
         ]
 
-    def get_url_for_size(self, size):
+    def get_url_for_size(self, _size: int) -> None:  # noqa: D102, PLR6301
         return None  # the Spotify URLs are hash-based
 
 
-def download_spotify(song: str, artist: str | None = None, market: str | None = None):
-    """
-    Fetch the Spotify search results.
-    """
+def download_spotify(song: str, artist: str | None = None, market: str | None = None) -> list[Song]:
+    """Fetch the Spotify search results."""
     access_token = get_access_token()
     if not access_token:
         logger.error("No access token: stop Spotify search")
@@ -144,21 +148,18 @@ def download_spotify(song: str, artist: str | None = None, market: str | None = 
         logger.debug("JSON decoding error: %s", err)
         return []
 
-    # result = validate_schema(SpotifyData, result)
-
-    ret: list[Song] = []
-    for element in result.get("tracks", {}).get("items", []):
-        ret.append(
-            Song(
-                title=get(element, "name", str),
-                artists=[get(artist, "name", str) for artist in element.get("artists", {})],
-                album=get(element.get("album", {}), "name", str),
-                duration=get(element, "duration_ms", int) / 1000,
-                isrc=get(element, ("external_ids", "isrc"), str),
-                picture=SpotifyPictureProvider(element),
-                # TODO add other elements?
-            )
+    ret: list[Song] = [
+        Song(
+            title=get(element, "name", str),
+            artists=[get(artist, "name", str) for artist in element.get("artists", {})],
+            album=get(element.get("album", {}), "name", str),
+            duration=get(element, "duration_ms", int) / 1000,
+            isrc=get(element, ("external_ids", "isrc"), str),
+            picture=SpotifyPictureProvider(element),
+            # TODO: add other elements?
         )
+        for element in result.get("tracks", {}).get("items", [])
+    ]
 
     logger.debug("Results:\n%s", pformat(ret))
 

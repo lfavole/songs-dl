@@ -1,3 +1,4 @@
+"""Replace the `site_url` config option by the `READTHEDOCS_CANONICAL_URL` environment variable on ReadTheDocs."""
 import os
 import re
 from pathlib import Path

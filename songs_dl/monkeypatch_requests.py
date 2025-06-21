@@ -1,25 +1,27 @@
-"""
-Monkeypatch of the requests library to add a progress bar to each request.
-"""
+"""Monkey-patch of the requests library to add a progress bar to each request."""
+
+from collections.abc import Generator
+from typing import Any
 
 from requests.models import Response
 from tqdm import tqdm
 
 
-def mp_requests():
+def mp_requests() -> None:
+    """Monkey-patch the `Response.iter_content` method."""
     if hasattr(Response.iter_content, "monkeypatched"):
         return
 
-    def iter_content(self, *args, **kwargs):
+    def iter_content(self: Response, *args, **kwargs) -> Generator[Any, None, None]:  # noqa: ANN002, ANN003
         pb = tqdm(unit_scale=True, unit="B")
         if "Content-Length" in self.headers:
             pb.total = int(self.headers["Content-Length"])
-        for e in Response._old_iter_content(self, *args, **kwargs):  # type: ignore
+        for e in old_iter_content(self, *args, **kwargs):
             pb.update(len(e))
             yield e
         pb.close()
 
     iter_content.monkeypatched = True
 
-    Response._old_iter_content = Response.iter_content  # type: ignore
+    old_iter_content = Response.iter_content
     Response.iter_content = iter_content

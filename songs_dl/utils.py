@@ -1,37 +1,36 @@
-"""
-Utilitary functions.
-"""
+"""Utilitary functions."""
 
 import datetime as dt
+import difflib
 import functools
 import inspect
 import logging
 import math
+import operator
 import re
+from collections.abc import Callable, Iterable, Sequence
 from io import BytesIO
 from threading import Lock
 from typing import (
     Any,
-    Callable,
-    Iterable,
     Literal,
     Required,
-    Sequence,
-    Type,
+    Self,
     TypedDict,
     TypeVar,
-    Union,
     get_origin,
     overload,
 )
 
 import mutagen.id3
 import requests
-from rapidfuzz import fuzz
 from unidecode import unidecode as unidecode_py
 from yt_dlp.utils import traverse_obj
 
-Self = TypeVar("Self")
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +39,7 @@ AnyT = TypeVar("AnyT")
 
 
 def merge_dicts(
-    *args: Union[dict[AnyDictKey, AnyT], TypedDict], merge_lists: bool | None = False
+    *args: dict[AnyDictKey, AnyT], merge_lists: bool | None = False
 ) -> dict[AnyDictKey, list[AnyT]]:
     """
     Merge many dicts and return a dict with arrays containing all values.
@@ -52,21 +51,27 @@ def merge_dicts(
 
     >>> merge_dicts({"a": "b"}, {"x": "y"}, {"a": "c"}, {"x": ["z", "Z"]}, merge_lists = None)
     {"a": ["b", "c"], "x": ["y", "z", "Z"]}
+
+    Raises:
+        ValueError: if `merge_lists` is `True` and a value is not a list/tuple.
+
     """
     ret = {}
     for arg in args:
         for key, value in arg.items():
-            if value:
-                if ret.get(key) is None:
-                    ret[key] = []
-                if merge_lists is None:
-                    if not isinstance(value, list) and not isinstance(value, tuple):
-                        value = [value]
-                elif merge_lists is False:
-                    value = [value]
-                else:
-                    if not isinstance(value, list) and not isinstance(value, tuple):
-                        raise ValueError(f"The value {key!r}: {value!r} is not a list")
+            if not value:
+                continue
+            if ret.get(key) is None:
+                ret[key] = []
+            if merge_lists is None:
+                if not isinstance(value, list) and not isinstance(value, tuple):
+                    ret[key].append(value)
+            elif merge_lists is False:
+                ret[key].append(value)
+            elif not isinstance(value, list) and not isinstance(value, tuple):
+                msg = f"The value {key!r}: {value!r} is not a list"
+                raise ValueError(msg)
+            else:
                 ret[key].append(*value)
     return ret
 
@@ -74,7 +79,7 @@ def merge_dicts(
 ExpectedT = TypeVar("ExpectedT")
 
 
-def get_base_type(candidate):
+def get_base_type(candidate: type) -> type:
     """
     Return the base type of a type.
 
@@ -86,44 +91,42 @@ def get_base_type(candidate):
     origin = get_origin(candidate)
     if origin:
         return origin
-    if not isinstance(candidate, type):
-        return type(candidate)
     return candidate
 
 
 @overload
-def get(obj: Any, paths: Any, expected: Callable[[Any], ExpectedT]) -> ExpectedT: ...
+def get(obj: Any, paths: Any, expected: Callable[[Any], ExpectedT]) -> ExpectedT: ...  # noqa: ANN401
 
 
 @overload
-def get(obj: Any, paths: Any, expected: Type[ExpectedT]) -> ExpectedT: ...
+def get(obj: Any, paths: Any, expected: type[ExpectedT]) -> ExpectedT: ...  # noqa: ANN401
 
 
 @overload
-def get(obj: Any, paths: Any, expected: ExpectedT) -> ExpectedT: ...
+def get(obj: Any, paths: Any, expected: ExpectedT) -> ExpectedT: ...  # noqa: ANN401
 
 
 @overload
 def get(
     obj: dict[str, Any] | Sequence[Any],
-    *paths: Any,
+    *paths: Any,  # noqa: ANN401
     expected: Callable[[Any], ExpectedT],
 ) -> ExpectedT: ...
 
 
 @overload
-def get(obj: dict[str, Any] | Sequence[Any], *paths: Any, expected: Type[ExpectedT]) -> ExpectedT: ...
+def get(obj: dict[str, Any] | Sequence[Any], *paths: Any, expected: type[ExpectedT]) -> ExpectedT: ...  # noqa: ANN401
 
 
 @overload
-def get(obj: dict[str, Any] | Sequence[Any], *paths: Any, expected: ExpectedT) -> ExpectedT: ...
+def get(obj: dict[str, Any] | Sequence[Any], *paths: Any, expected: ExpectedT) -> ExpectedT: ...  # noqa: ANN401
 
 
 @overload
-def get(obj: Any, *paths: Any, expected: None = ...) -> Any: ...
+def get(obj: Any, *paths: Any, expected: None = ...) -> Any: ...  # noqa: ANN401
 
 
-def get(obj, *paths, expected=None, **kwargs):
+def get(obj, *paths, expected=None, expected_type=None, **kwargs):
     """
     Safely traverse nested `dict`s and `Sequence`s.
 
@@ -131,9 +134,8 @@ def get(obj, *paths, expected=None, **kwargs):
 
     See `yt_dlp.utils.traverse_obj` docstring for more information.
     """
-    expected_type = kwargs.pop("expected_type", None)
     expected = expected or expected_type
-    if not expected and (get_base_type(paths[-1]) or callable(paths[:-1])):
+    if not expected and (get_base_type(paths[-1]) or callable(paths[-1])):
         expected = paths[-1]
         paths = paths[:-1]
     if expected:
@@ -149,12 +151,10 @@ def get(obj, *paths, expected=None, **kwargs):
     return ret
 
 
-def instantiate(target_type: Type[ExpectedT] | Callable[[Any], ExpectedT]) -> ExpectedT | None:
-    """
-    Return an empty instance of the given type/function or `None` if it's not possible.
-    """
+def instantiate(target_type: type[ExpectedT] | Callable[[Any], ExpectedT]) -> ExpectedT | None:
+    """Return an empty instance of the given type/function or `None` if it's not possible."""
     if target_type is dt.date:
-        target_type = dt.date.fromisoformat  # type: ignore
+        target_type = dt.date.fromisoformat
 
     target_type = get_base_type(target_type)
 
@@ -164,40 +164,39 @@ def instantiate(target_type: Type[ExpectedT] | Callable[[Any], ExpectedT]) -> Ex
         (0),
     ]:
         try:
-            return target_type(*args)  # type: ignore
-        except:  # noqa
+            return target_type(*args)
+        except:  # noqa: E722, PERF203, S110
             pass
 
     return None
 
 
-def fuzz_wrapper(func):
-    """
-    Decorator for `rapidfuzz` functions: work around emojis that cause bugs.
-    """
-
-    @functools.wraps(func)
-    def wrapper(str1: str, str2: str, score_cutoff: float = 0):
-        try:
-            return func(str1, str2, score_cutoff)
-        except:  # noqa
-            # we build new strings that contain only alphanumerical characters and spaces
-            # and return the partial_ratio of that
-            new_str1 = "".join(each_letter for each_letter in str1 if each_letter.isalnum() or each_letter.isspace())
-            new_str2 = "".join(each_letter for each_letter in str2 if each_letter.isalnum() or each_letter.isspace())
-            return func(new_str1, new_str2, score_cutoff=score_cutoff)
-
-    return wrapper
+F = TypeVar("F", bound=Callable)
 
 
-_ratio = fuzz_wrapper(fuzz.ratio)
-_partial_ratio = fuzz_wrapper(fuzz.partial_ratio)
+def ratio(string1, string2):
+    return difflib.SequenceMatcher(None, string1, string2).ratio()
+
+
+def partial_ratio(string1, string2):
+    # Find the longest match
+    seq_matcher = difflib.SequenceMatcher(None, string1, string2)
+    match = seq_matcher.find_longest_match(0, len(string1), 0, len(string2))
+
+    # Calculate the length of the matching subsequence
+    match_length = match.size
+    if match_length == 0:
+        return 0.0
+
+    # Calculate the ratio based on the longest match
+    matched_string1 = string1[match.a: match.a + match_length]
+    matched_string2 = string2[match.b: match.b + match_length]
+
+    return difflib.SequenceMatcher(None, matched_string1, matched_string2).ratio()
 
 
 class Picture:
-    """
-    A picture (album art) on a website.
-    """
+    """A picture (album art) on a website."""
 
     CHUNK_SIZE = 64 * 1024
 
@@ -206,9 +205,10 @@ class Picture:
         url: str = "",
         width: int = 0,
         height: int = 0,
-        sure=True,
+        sure: bool = True,
         data: Literal[False] | bytes | None = None,
-    ):
+    ) -> None:
+        """Create a new `Picture`."""
         self.url = url
         self.width = width
         self.height = height or width
@@ -218,47 +218,40 @@ class Picture:
         self._pillow = None
         self._load_metadata()
 
-    def _load_metadata(self):
+    def _load_metadata(self) -> None:
         if self.data:
             self.sure = True
-            try:
-                from PIL import Image
-
-                img = Image.open(BytesIO(self.data))
-                self._pillow = img
-                self.width, self.height = img.size
-            except (ImportError, OSError):
-                pass
+            if Image is not None:
+                try:
+                    img = Image.open(BytesIO(self.data))
+                    self._pillow = img
+                    self.width, self.height = img.size
+                except OSError:
+                    pass
 
     @property
-    def pillow(self):
+    def pillow(self) -> Image.Image | None:  # noqa: D102
         if self._pillow is not None:
             return self._pillow
 
-        if not isinstance(self.data, bytes):
+        if not isinstance(self.data, bytes) or Image is None:
             return None
-
-        from PIL import Image
 
         self._pillow = Image.open(BytesIO(self.data))
         return self._pillow
 
     @property
-    def size(self):
-        """
-        Size of the image (smallest dimension).
-        """
+    def size(self) -> float:
+        """Size of the image (smallest dimension)."""
         return min(self.width, self.height)
 
-    def check(self):
-        """
-        Check if the picture exists (without downloading it, if possible).
-        """
+    def check(self) -> None:
+        """Check if the picture exists (without downloading it, if possible)."""
         if self.sure:
             return True
         logger.debug("Checking picture '%s'...", self.url)
         # don't download the picture, just the headers
-        req = requests.head(self.url, stream=True)
+        req = requests.head(self.url, stream=True)  # noqa: S113
         try:
             req.raise_for_status()
             self.sure = True
@@ -268,9 +261,7 @@ class Picture:
         return self.sure
 
     def download(self) -> Literal[False] | bytes:
-        """
-        Download the picture.
-        """
+        """Download the picture."""
         if self.data is not None:
             return self.data
 
@@ -281,9 +272,9 @@ class Picture:
 
         try:
             # don't download the page if there is an error
-            self.req = requests.get(self.url, stream=True)
+            self.req = requests.get(self.url, stream=True)  # noqa: S113
             self.req.raise_for_status()
-            self.data = self.req.content
+            self.data = self.req.content or b""
         except requests.exceptions.HTTPError as err:
             logger.debug("HTTP error: %s...", err)
             self.data = False
@@ -291,44 +282,43 @@ class Picture:
         logger.debug("Picture downloaded")
         return self.data
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """Return the debug representation of the picture."""
         return f"<Picture {self.size}x{self.size} {'sure' if self.sure else 'not sure'} at {self.url}>"
 
 
 class PictureProvider:
-    """
-    Class for listing and downloading the images of a website.
-    """
+    """Class for listing and downloading the images of a website."""
 
-    pictures: list[Picture]
+    def __init__(self, result: dict[str, Any]) -> None:
+        """Create a new `PictureProvider`."""
+        self.result = result
 
-    def __init__(self, result: dict[str, Any]):
-        self.provider_urls = {pic.size: pic for pic in self.get_sure_pictures(result)}
+        self.pictures = self.get_sure_pictures()
 
-        self.pictures = self.get_sure_pictures(result)
+        self.provider_urls = {pic.size: pic for pic in self.pictures}
 
-        if not self.pictures:
-            return
+        if self.pictures:
+            sizes_to_try = [1200, 1000, 800, 500, 300]
 
-        sizes_to_try = [1200, 1000, 800, 500, 300]
+            for size in sizes_to_try:
+                if not any(pic.size == size for pic in self.pictures):
+                    url = self.get_url_for_size(size)
+                    if url:
+                        self.pictures.append(Picture(url, size, sure=False))
 
-        for size in sizes_to_try:
-            if not any(pic.size == size for pic in self.pictures):
-                url = self.get_url_for_size(size)
-                if url:
-                    self.pictures.append(Picture(url, size, sure=False))
+            self.pictures.sort(key=lambda pic: pic.size, reverse=True)
 
-        self.pictures.sort(key=lambda pic: pic.size, reverse=True)
-
-    def get_sure_pictures(self, result: dict[str, Any]) -> list[Picture]:
-        """
-        Return a list of all the sure pictures.
-        """
+    def get_sure_pictures(self) -> list[Picture]:
+        """Return a list of all the sure pictures."""
         raise NotImplementedError
 
     def get_url_for_size(self, size: int) -> str | None:
         """
-        Return a probably valid URL for the given size.
+        Return a (probably) valid URL for the given size, if possible.
+
+        The default implementation tries to replace the size of a picture with the asked size for all the pictures.
+        If the URLs do not contain the size, this method should be overridden and return `None`.
         """
         for picture in self.pictures:
             picture_size = picture.size
@@ -339,18 +329,22 @@ class PictureProvider:
                 url_parts[-1] = url_parts[-1].replace(str(picture_size), str(size))
                 return "/".join(url_parts)
 
-    def get_pictures(self):
-        return self.pictures
+        return None
 
-    def get_best_picture(self):
+    @property
+    def best_picture(self) -> Picture:
+        """The best picture."""
         return self.pictures[0]
 
     @property
-    def pillow(self):
-        return self.get_best_picture().pillow
+    def pillow(self) -> "Image.Image | None":
+        """The best picture, opened with Pillow if it is available."""
+        return self.best_picture.pillow
 
 
 class TagsList(TypedDict, total=False):
+    """A list of ID3 tags."""
+
     TIT2: Required[str]
     TPE1: Required[str]
     TALB: str
@@ -370,16 +364,33 @@ class TagsList(TypedDict, total=False):
     APIC: Picture | None
 
 
-class Song:
-    """
-    A song.
-    """
+class Artists:
+    """An artists list from MusicBrainz."""
+    def __init__(self, mb_data):
+        self.mb_data = mb_data
 
-    def __init__(
+    def __bool__(self):
+        return len(self.mb_data) > 0
+
+    def __str__(self):
+        ret = ""
+        previous = None
+        for artist in self.mb_data:
+            if previous is not None:
+                ret += previous.get("joinphrase", ", ")
+            ret += artist["name"]
+            previous = ret
+        return ret
+
+
+class Song:
+    """A song."""
+
+    def __init__(  # noqa: PLR0913
         self,
         *,
         title: str = "",
-        artists: list[str] | tuple[str, ...] = (),
+        artists: list[str] | tuple[str, ...] | Artists = (),
         album: str | None = None,
         duration: float = 0,
         language: str | None = None,
@@ -388,13 +399,14 @@ class Song:
         release_date: str | dt.date | None = None,
         isrc: str | None = None,
         track_number: int | tuple[int, int | None] | None = None,
-        copyright: str | None = None,  # pylint: disable=W0622
+        copyright: str | None = None,  # noqa: A002
         lyrics: str | list[tuple[str, float]] | None = None,
         picture: Picture | PictureProvider | None = None,
         comments: str | None = None,
-    ):
+    ) -> None:
+        """Create a new `Song`."""
         self.title = title
-        self.artists = list(artists)
+        self.artists = artists
         self.album = album
         self.duration = duration
         self.language = language
@@ -415,19 +427,16 @@ class Song:
         self.comments = comments
 
     @classmethod
-    def empty(cls):
-        """
-        Return an empty song for placeholder purposes.
-        """
+    def empty(cls) -> Self:
+        """Return an empty song for placeholder purposes."""
         return cls()
 
-    def __not__(self):
-        return not self.title and not self.artists
+    def __bool__(self) -> bool:
+        """Return `True` if the song is not empty, `False` otherwise."""
+        return bool(self.title or self.artists)
 
     def to_id3(self) -> TagsList:
-        """
-        Return the ID3 tags for a song.
-        """
+        """Return the ID3 tags for a song."""
         if not self:
             return {"TIT2": "", "TPE1": ""}
         r_date = self.release_date
@@ -435,19 +444,21 @@ class Song:
             year = date = time = ""
         else:
 
-            def test_value(value: str):
+            def test_value(value: str) -> str:
+                """Return `""` if the int representation of a value is 0, otherwise return the original value."""
                 return "" if not int(value) else value  # avoid "0000" for example...
 
             year = test_value(f"{r_date:%Y}")  # YYYY
             date = test_value(f"{r_date:%d%m}")  # DDMM
             time = test_value(f"{r_date:%H%M}")  # HHMM
 
-        def format_lrc_timestamp(timestamp: float):
+        def format_lrc_timestamp(timestamp: float) -> str:
+            """Format a LRC timestamp."""
             return f"[{int(timestamp // 60):02d}:{timestamp % 60:05.2f}]"
 
         ret: TagsList = {
             "TIT2": self.title,
-            "TPE1": ", ".join(self.artists),
+            "TPE1": str(self.artists) if isinstance(self.artists, Artists) else ", ".join(self.artists),
             "TALB": self.album or "",
             "TLEN": str(int(self.duration * 1000)) if self.duration is not None else "",
             "TCOM": ", ".join(self.composers) if self.composers else "",
@@ -473,20 +484,34 @@ class Song:
                 else (self.lyrics or "")
             ),
             "SYLT": [(line[0], int(line[1] * 1000)) for line in self.lyrics] if isinstance(self.lyrics, list) else [],
-            "APIC": self.picture.get_best_picture() if isinstance(self.picture, PictureProvider) else self.picture,
+            "APIC": self.picture.best_picture if isinstance(self.picture, PictureProvider) else self.picture,
             "COMM": self.comments or "",
         }
         return ret
 
+    @staticmethod
+    def _parse_track_number(tag: str) -> tuple[int, int] | int | None:
+        """Parse a `TRCK` ID3 tag. Return `(track, total_tracks)`, `track` or `None`."""
+        track_n = tag.split("/")
+        if len(track_n) < 2:  # noqa: PLR2004
+            track_n.append("")
+
+        if track_n[1]:
+            return int(track_n[0]), int(track_n[1])
+        if track_n[0]:
+            return int(track_n[0])
+        return None
+
     @classmethod
-    def from_id3(cls, file):
+    def from_id3(cls, file: str) -> Self:
+        """Create a `Song` from ID3 metadata present in a given file."""
         id3 = mutagen.id3.ID3(file)
 
         @overload
         def get_tag(tag: str, integer: Literal[False] = False) -> str: ...
 
         @overload
-        def get_tag(tag: str, integer: Literal[True] = True) -> int: ...
+        def get_tag(tag: str, integer: Literal[True]) -> int: ...
 
         def get_tag(tag, integer=False):
             item = id3.getall(tag)
@@ -501,7 +526,7 @@ class Song:
 
             if integer:
                 try:
-                    return int(float(text))
+                    return int(text)
                 except ValueError:
                     return 0
             return text
@@ -513,14 +538,11 @@ class Song:
         except (ValueError, IndexError):
             release_date = None
 
-        track_n = get_tag("TRCK").split("/")
-        if len(track_n) < 2:
-            track_n.append("")
-        track_n = (int(track_n[0]), int(track_n[1])) if track_n[1] else int(track_n[0]) if track_n[0] else None
+        track_n = cls._parse_track_number(get_tag("TRCK"))
 
         pictures = id3.getall("APIC")
 
-        return Song(
+        return cls(
             title=get_tag("TIT2"),
             artists=[get_tag("TPE1")],
             album=get_tag("TALB"),
@@ -538,7 +560,8 @@ class Song:
         )
 
     @classmethod
-    def merge(cls: Type[Self], songs: list[Self]) -> Self:
+    def merge(cls: type[Self], songs: list[Self]) -> Self:
+        """Merge two songs, taking the first available information in all the songs. Return the new song."""
         T = TypeVar("T")
         T2 = TypeVar("T2")
 
@@ -556,30 +579,25 @@ class Song:
         for arg, def_value in (inspect.getfullargspec(cls.__init__).kwonlydefaults or {}).items():
             kwargs[arg] = get_first((getattr(song, arg) for song in songs), def_value)
 
-        return cls(**kwargs)  # type: ignore
+        return cls(**kwargs)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """Return the debug representation of the song."""
         return f"<Song '{self.title}' by {', '.join(self.artists)} album {self.album} {self.duration} s>"
 
 
-def _get_sentence_words(string: str):
-    """
-    Get all the words in a sentence.
-    """
+def _get_sentence_words(string: str) -> str:
+    """Get all the words in a sentence."""
     return re.findall(r"\w+", unidecode(string.lower()))
 
 
-def _normalize_sentence(string: str):
-    """
-    Return a sentence without punctuation, without brackets and lowercased.
-    """
+def _normalize_sentence(string: str) -> str:
+    """Return a sentence without punctuation, without brackets and lowercased."""
     return " ".join(_get_sentence_words(re.sub(r"(?i)\(.*?\)|-\s+.*|feat", "", string)))
 
 
-def get_provider_name(provider: str):
-    """
-    Return the human name of a provider.
-    """
+def get_provider_name(provider: str) -> str:
+    """Return the human name of a provider."""
     return {"itunes": "iTunes", "youtube": "YouTube"}.get(provider, provider.title())
 
 
@@ -594,6 +612,7 @@ DISCARD_RE = re.compile(
     |\b8d audio\b
     |\bspee?d up\b
     |\baco?usti
+    |\bpiano
     |\blive\b
     |\bdire[ct]ta?\b
     |\bremix
@@ -604,10 +623,8 @@ DISCARD_RE = re.compile(
 )
 
 
-def order_results(provider: str, best_items: list[Song], results: dict[str, list[Song]] | None):
-    """
-    Order the results: choose the result that is the most similar to the Spotify / Deezer song.
-    """
+def order_results(provider: str, best_items: list[Song], results: dict[str, list[Song]] | None) -> list[Song]:
+    """Order the results: choose the result that is the most similar to the Spotify / Deezer song."""
     if not results:
         return best_items
 
@@ -615,29 +632,28 @@ def order_results(provider: str, best_items: list[Song], results: dict[str, list
 
     ret: list[tuple[Song, float, list[float]]] = []
 
-    def normalize_title(title: str):
+    def normalize_title(title: str) -> str:
         title = re.sub(r"\.\s*(?=\w\W|\w$|$)", "", title)
         title = re.sub(r"\bst(e?s?)(\s+|$)", r"saint\1\2", title)
-        return title
+        title = re.sub(r"(?<=\w)\W+(ve|d|ll|s|m|re)", r"\1", title)
+        title = re.sub(r"(?<=\wn)\W+t", r"t", title)
+        return title  # noqa: RET504
 
     for result in results[provider]:
         # check for common word
         song_title = normalize_title(result.title)
         best_title = normalize_title(best_item.title)
-        best_title_words = _get_sentence_words(best_title)
 
-        if not any(word in _get_sentence_words(song_title) for word in best_title_words):
+        if not any(word in _get_sentence_words(song_title) for word in _get_sentence_words(best_title)):
             # if there are no common words, skip result
             continue
 
         # Find artist match
         # match = (no of artist names in result) / (no of artist names on spotify) * 100
-        artist_match_number = 0
-
         all_r_artists = _normalize_sentence(" ".join(result.artists))
 
         artist_match_number = sum(
-            1 if _partial_ratio(_normalize_sentence(sp_artist), all_r_artists, 85) else 0
+            1 if partial_ratio(_normalize_sentence(sp_artist), all_r_artists, 85) else 0
             for sp_artist in best_item.artists
         )
 
@@ -647,7 +663,7 @@ def order_results(provider: str, best_items: list[Song], results: dict[str, list
         if artist_match_number == 0:
             continue
 
-        name_match = _ratio(
+        name_match = ratio(
             str(unidecode(best_title.lower())),
             str(unidecode(song_title.lower())),
             60,
@@ -656,7 +672,7 @@ def order_results(provider: str, best_items: list[Song], results: dict[str, list
         official_match = (
             len(
                 re.findall(
-                    r"(?i)(\b[ou]ffi[cz]i[ae]l|_off\b|\btopic\b|audio(?=.*\b[ou]ffi[cz]i[ae]l))",
+                    r"(?i)(\b[ou]ffi[cz]i[ae]l|_off\b|\btopic\b|\blyric|\bparole|audio(?=.*\b[ou]ffi[cz]i[ae]l))",
                     song_title + " " + all_r_artists,
                 )
             )
@@ -664,7 +680,7 @@ def order_results(provider: str, best_items: list[Song], results: dict[str, list
         )
         if not official_match and hasattr(result, "youtube_video"):
             official_match += (
-                100 if "BADGE_STYLE_TYPE_VERIFIED_ARTIST" in result.youtube_video["badges"] else 0  # type: ignore
+                100 if "BADGE_STYLE_TYPE_VERIFIED_ARTIST" in result.youtube_video["badges"] else 0
             )
         if official_match:
             official_match += len(re.findall(r"(?i)\baudio\b", song_title)) * 100
@@ -691,9 +707,9 @@ def order_results(provider: str, best_items: list[Song], results: dict[str, list
                 + official_match * 2
                 + copyright_match * 2
                 + time_match * 3
-                + views_match
+                + views_match * 0.5
                 + discard_match * 2
-            ) / 12,
+            ) / 11.5,
             ndigits=3,
         )
 
@@ -704,7 +720,7 @@ def order_results(provider: str, best_items: list[Song], results: dict[str, list
             [artist_match, name_match, official_match, copyright_match, time_match, views_match, discard_match],
         ))
 
-    ret = sorted(ret, key=lambda el: el[1], reverse=True)
+    ret = sorted(ret, key=operator.itemgetter(1), reverse=True)
     logger.debug(
         "%s sorted results:\n%s",
         get_provider_name(provider),
@@ -715,24 +731,23 @@ def order_results(provider: str, best_items: list[Song], results: dict[str, list
 
 # for type checking
 def unidecode(string: str) -> str:
-    """
-    Transliterate an Unicode object into an ASCII string.
-    """
-    return unidecode_py(string)  # type: ignore
+    """Transliterate an Unicode object into an ASCII string."""
+    return unidecode_py(string)
 
 
 AnyFunction = TypeVar("AnyFunction", bound=Callable)
 
 
-def locked(lock: Lock):
+def locked(lock: Lock) -> Callable[[AnyFunction], AnyFunction]:
     """
-    Acquire a lock before executing the function and release it after
-    (if the lock has already been released, don't do anything).
+    Acquire a lock before executing the function and release it after.
+
+    If the lock has already been released, don't do anything.
     """
 
     def decorator(f: AnyFunction) -> AnyFunction:
         @functools.wraps(f)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs) -> Any:  # noqa: ANN002, ANN003, ANN401
             lock.acquire()
             try:
                 return f(*args, **kwargs)
@@ -740,13 +755,11 @@ def locked(lock: Lock):
                 if lock.locked():
                     lock.release()
 
-        return wrapper  # type: ignore
+        return wrapper
 
     return decorator
 
 
-def format_query(song: str, artist: str | None = None, market: str | None = None):
-    """
-    Return a formatted version of `song`, `artist` and `market` (for logging).
-    """
+def format_query(song: str, artist: str | None = None, market: str | None = None) -> str:
+    """Return a formatted version of `song`, `artist` and `market` (for logging)."""
     return f"'{song}'" + (f" - '{artist}'" if artist else "") + (f" on '{market}' market" if market else "")

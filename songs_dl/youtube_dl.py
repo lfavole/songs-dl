@@ -1,5 +1,7 @@
+"""Utility functions to download a song video with `yt_dlp`."""
 import datetime as dt
 import logging
+from typing import Any
 
 from yt_dlp.YoutubeDL import YoutubeDL
 
@@ -10,14 +12,12 @@ logger = logging.getLogger(__name__)
 
 
 @locked(youtube_lock)
-def download_youtube_dl(url: str):
-    """
-    Download a video with `yt_dlp`.
-    """
+def download_youtube_dl(url: str) -> tuple[str, Song]:
+    """Download a video with `yt_dlp`."""
     filename = ""
     info_dict = {}
 
-    def progress_hook(data):
+    def progress_hook(data: dict[str, Any]) -> None:
         nonlocal filename, info_dict
         if data["status"] == "finished":
             filename = data["filename"]

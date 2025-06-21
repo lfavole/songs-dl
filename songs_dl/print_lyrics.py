@@ -1,7 +1,5 @@
+"""Create a PDF containing the lyrics of the given song."""
 import argparse
-import os
-import sys
-from glob import glob
 from pathlib import Path
 
 try:
@@ -10,22 +8,23 @@ try:
 except ModuleNotFoundError as err:
     msg = "The fpdf2 module was not found. Please reinstall songs-dl with pip install songs-dl[lyrics]."
     raise ModuleNotFoundError(msg) from err
-from mutagen.id3._util import ID3NoHeaderError
+from mutagen.id3._util import ID3NoHeaderError  # noqa: PLC2701
 
 from songs_dl.utils import Song
 
 
-def print_lyrics(*songs_or_lyrics):
+def print_lyrics(*songs_or_lyrics: str) -> None:
+    """Create a PDF with lyrics from one or more songs."""
     song_files = []
     for file in songs_or_lyrics:
-        song_files.extend(glob(file))
+        song_files.extend(Path().glob(file))
 
     songs = []
     for song in song_files:
         try:
             songs.append(Song.from_id3(song))
-        except ID3NoHeaderError:
-            songs.append(Path(song).read_text())
+        except ID3NoHeaderError:  # noqa: PERF203
+            songs.append(Path(song).read_text("utf-8"))
 
     pdf = FPDF()
     pdf.add_font("Montserrat", "", "C:/Windows/Fonts/Montserrat-Regular.ttf")
@@ -48,7 +47,7 @@ def print_lyrics(*songs_or_lyrics):
         else:
             lyrics = song
 
-        with pdf.text_columns(ncols=2) as cols:  # type: ignore
+        with pdf.text_columns(ncols=2) as cols:
             cols.write(lyrics)
             if isinstance(song, Song) and song.picture and song.picture.pillow:
                 cols.ln()
@@ -72,14 +71,14 @@ def print_lyrics(*songs_or_lyrics):
 
     file = "lyrics.pdf"
     pdf.output(file)
-    os.startfile(file)
 
 
-def main():
+def main() -> None:
+    """Run the CLI."""
     parser = argparse.ArgumentParser(fromfile_prefix_chars="@")
     parser.add_argument("SONG_OR_LYRICS", nargs="+", help="songs for which we will print the lyrics or lyrics files")
 
-    args = parser.parse_args(sys.argv[1:] or ["D:/Users/Laurent/Music/Chansons décembre 2023/Esmée - Memento.mp3"])
+    args = parser.parse_args()
     print_lyrics(*args.SONG_OR_LYRICS)
 
 

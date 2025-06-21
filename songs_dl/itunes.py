@@ -1,3 +1,5 @@
+"""Functions to get metadata from iTunes."""
+
 import logging
 from threading import Lock
 from typing import Any
@@ -11,29 +13,28 @@ itunes_lock = Lock()
 
 
 class ItunesPictureProvider(PictureProvider):
-    def get_sure_pictures(self, result: dict[str, Any]):
-        # TODO add debug information
+    """A picture provider for iTunes."""
+
+    def get_sure_pictures(self) -> list[Picture]:  # noqa: D102
+        # TODO: add debug information
         pictures: list[Picture] = []
 
-        for key, value in result.items():
+        for key, value in self.result.items():
             if key.startswith("artworkUrl"):
                 try:
-                    pictures.append(Picture(value, int(key.removeprefix("artworkUrl"))))
+                    size = int(key.removeprefix("artworkUrl"))
                 except ValueError:  # invalid number
                     pass
+                else:
+                    pictures.append(Picture(value, size))
 
         return pictures
 
 
-def download_itunes(song: str, artist: str | None = None, market: str | None = None):
-    """
-    Fetch the iTunes search results.
-    """
+def download_itunes(song: str, artist: str | None = None, market: str | None = None) -> list[Song]:
+    """Fetch the iTunes search results."""
     logger.info("Searching %s on iTunes...", format_query(song, artist, market))
-    if artist:
-        query = f"{song} {artist}"
-    else:
-        query = song
+    query = f"{song} {artist}" if artist else song
     params = {"term": query, "entity": "song"}
     if market:
         params["country"] = market
@@ -52,25 +53,22 @@ def download_itunes(song: str, artist: str | None = None, market: str | None = N
         logger.debug("No 'results' index")
         return []  # same thing
 
-    ret: list[Song] = []
-
-    for result in results:
-        ret.append(
-            Song(
-                title=get(result, "trackName", str),
-                artists=[get(result, "artistName", str)],
-                album=get(result, "collectionName", str),
-                duration=get(result, "trackTimeMillis", int) / 1000,
-                language=get(result, "country", str).lower(),
-                genre=get(result, "primaryGenreName", str),
-                track_number=(
-                    get(result, "trackNumber", int),
-                    get(result, "trackCount", int),
-                ),
-                release_date=get(result, "releaseDate", str),
-                # picture = Picture(image, taille) if image and taille else None,
-                picture=ItunesPictureProvider(result),
-            )
+    ret: list[Song] = [
+        Song(
+            title=get(result, "trackName", str),
+            artists=[get(result, "artistName", str)],
+            album=get(result, "collectionName", str),
+            duration=get(result, "trackTimeMillis", int) / 1000,
+            language=get(result, "country", str).lower(),
+            genre=get(result, "primaryGenreName", str),
+            track_number=(
+                get(result, "trackNumber", int),
+                get(result, "trackCount", int),
+            ),
+            release_date=get(result, "releaseDate", str),
+            picture=ItunesPictureProvider(result),
         )
+        for result in results
+    ]
 
     return ret

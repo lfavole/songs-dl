@@ -1,3 +1,5 @@
+"""Functions to get metadata and songs from YouTube."""
+
 import json
 import logging
 import re
@@ -15,6 +17,8 @@ logger = logging.getLogger(__name__)
 
 
 class YoutubeVideo(TypedDict):
+    """A YouTube video."""
+
     id: str
     thumbnail: str
     title: str
@@ -26,36 +30,52 @@ class YoutubeVideo(TypedDict):
 
 
 class Thumbnail(TypedDict):
+    """A YouTube thumbnail."""
+
     width: int
     size: int
     url: str
 
 
 class YtThumbnailObject(TypedDict):
+    """A YouTube thumbnail list."""
+
     thumbnails: list[Thumbnail]
 
 
 class YtText(TypedDict):
+    """A text on YouTube."""
+
     text: str
 
 
 class YtRunsText(TypedDict):
+    """A YouTube container for list of texts."""
+
     runs: list[YtText]
 
 
 class YtSimpleText(TypedDict):
+    """A YouTube text container."""
+
     simpleText: str
 
 
 class YtBadge(TypedDict):
+    """A YouTube badge."""
+
     style: str
 
 
 class YtBadgeObject(TypedDict):
+    """A YouTube badge container."""
+
     metadataBadgeRenderer: YtBadge
 
 
 class YtInitialData(TypedDict):
+    """Data provided by YouTube."""
+
     videoId: str
     thumbnail: YtThumbnailObject
     title: YtRunsText
@@ -71,27 +91,25 @@ class YtInitialData(TypedDict):
 
 
 class YoutubeSong(Song):
-    def __init__(self, *args, youtube_video: YoutubeVideo, **kwargs):
+    """A `Song` that is available as a YouTube video."""
+
+    def __init__(self, *args, youtube_video: YoutubeVideo, **kwargs) -> None:  # noqa: ANN002, ANN003
+        """Create a new `YoutubeSong`."""
         self.youtube_video = youtube_video
         super().__init__(*args, **kwargs)
 
 
-def download_youtube(song: str, artist: str | None = None, _market: str | None = None):
-    """
-    Get the YouTube search results.
-    """
+def download_youtube(song: str, artist: str | None = None, _market: str | None = None) -> list[YoutubeSong]:
+    """Get the YouTube search results."""
     logger.info("Searching %s on YouTube...", format_query(song, artist))
-    if artist:
-        query = song + " " + artist
-    else:
-        query = song
+    query = f"{song} {artist}" if artist else song
     song = f"allintitle:{song}"
     req = locked(youtube_lock)(requests.get)("https://www.youtube.com/results", params={"search_query": query})
     logger.debug("Page size: %d", len(req.text))
     if not (match := re.search(r"var ytInitialData = (.*?);</script>", req.text)):
         # no YouTube video = no song => stop
         logger.error("Search failed: can't get the results in the YouTube page!")
-        sys.exit()
+        return []
 
     logger.info("Results have been found")
     try:
@@ -116,20 +134,18 @@ def download_youtube(song: str, artist: str | None = None, _market: str | None =
     videos_list = []
     for content in main_contents:
         contents = get(content, ("itemSectionRenderer", "contents"), list)
-        for video in contents:
+        videos_list.extend(
+            video
+            for video in contents
             # there is other information like
             # promotedSparklesTextSearchRenderer...
             # but it's not useful
-            if "videoRenderer" in video:
-                videos_list.append(video)
-
-    if len(videos_list) == 0:
-        logger.critical("No results!")  # same thing
-        sys.exit()
+            if "videoRenderer" in video
+        )
 
     logger.debug("%d videos", len(videos_list))
 
-    def map_video(video_data: dict[str, Any]):
+    def map_video(video_data: dict[str, Any]) -> YoutubeSong:
         video = get(video_data, "videoRenderer", dict[str, Any])
         length = sum(
             # 0 = 1 (seconds); 1 = 60 (minutes); 2 = 3600 (hours); ...
@@ -138,18 +154,20 @@ def download_youtube(song: str, artist: str | None = None, _market: str | None =
                 get(video, ("lengthText", "simpleText"), str).split(":")[::-1]
             )  # from the end
         )
-        thumbnail: str = ""
-        size = 0
-        for f in get(video, ("thumbnail", "thumbnails"), list[dict[str, Any]]):
-            if get(f, "width", int) >= size:
-                size = get(f, "width", int)
-                thumbnail = get(f, "url", str)
+        thumbnail = get(
+            max(
+                [*get(video, ("thumbnail", "thumbnails"), list[dict[str, Any]]), {"url": "", "width": 0}],
+                key=lambda obj: get(obj, "width", int),
+            ),
+            "url",
+            str,
+        )
 
-        def get_int(value: str):
+        def get_int(value: str) -> int:
             """
-            Helper function for view count.
+            Return the view count from a view count string.
 
-            >>> get_int("12 345 views")s
+            >>> get_int("12 345 views")
             12345
             """
             value = "".join(c for c in value if c.isnumeric())
@@ -172,14 +190,13 @@ def download_youtube(song: str, artist: str | None = None, _market: str | None =
             "match_value": None,
         }
 
+        title = ret["title"]
         artists = []
 
         if " - " in ret["title"]:
             parts = ret["title"].split(" - ", 1)
             title = parts[1].strip().strip("-").strip()
             artists.append(parts[0].strip().strip("-").strip())
-        else:
-            title = ret["title"]
 
         match = re.search(
             r"""(?x)

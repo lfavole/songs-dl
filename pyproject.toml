@@ -17,13 +17,12 @@ keywords = ["youtube", "music"]
 dependencies = [
     "mutagen",
     "Pillow",
-    "rapidfuzz",
 	"requests",
     "tqdm",
     "Unidecode",
     "yt-dlp",
 ]
-requires-python = ">=3.7"
+requires-python = ">=3.10"
 
 [project.optional-dependencies]
 build = ["pyinstaller"]

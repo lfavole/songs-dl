@@ -1,3 +1,5 @@
+"""Functions to get metadata from Deezer."""
+
 import datetime as dt
 import json
 import logging
@@ -15,26 +17,24 @@ deezer_lock = Lock()
 
 
 class DeezerPictureProvider(PictureProvider):
-    """
-    Deezer picture provider.
-    """
+    """Deezer picture provider."""
 
-    def get_sure_pictures(self, result: dict[str, Any]):
-        # TODO add debug information
+    def get_sure_pictures(self) -> list[Picture]:  # noqa: D102
+        # TODO: add debug information
         pictures: list[Picture] = []
 
-        def get_size_from_url(url: str):
+        def get_size_from_url(url: str) -> int | None:
             _, basename = url.rsplit("/", 1)
-            size, other = basename.split("x", 1)
+            size_str, other = basename.split("x", 1)
             try:
-                size = int(size)
+                size = int(size_str)
             except ValueError:
                 return None
             if not other.startswith(str(size)):
                 return None
             return size
 
-        for key, value in get(result, "album", dict[str, str]).items():
+        for key, value in get(self.result, "album", dict[str, str]).items():
             if key.startswith("cover_"):
                 size = get_size_from_url(value)
                 if size is None:
@@ -52,11 +52,10 @@ class DeezerPictureProvider(PictureProvider):
 
 
 class DeezerLazySong(Song):
-    """
-    Deezer song with lazy request to the Deezer song page (with lyrics...) when needed.
-    """
+    """Deezer song with lazy request to the Deezer song page (with lyrics...) when needed."""
 
-    def __init__(self, result, *args, **kwargs):
+    def __init__(self, result: dict[str, Any], *args, **kwargs) -> None:  # noqa: ANN002, ANN003
+        """Create a `DeezerLazySong`."""
         self.result = result
 
         self._app_state: dict[str, Any] | None = None
@@ -65,17 +64,13 @@ class DeezerLazySong(Song):
         super().__init__(*args, **kwargs)
 
     @property
-    def fetched(self):
-        """
-        Is the Deezer song page fetched?
-        """
+    def fetched(self) -> bool:
+        """Return `True` if the Deezer song page has been fetched, `False` otherwise."""
         return self._app_state is not None
 
     @property
     def app_state(self) -> dict[str, Any]:
-        """
-        Data in the Deezer song page.
-        """
+        """Data in the Deezer song page."""
         if self._app_state is not None:
             return self._app_state
         self._app_state = {}
@@ -93,28 +88,22 @@ class DeezerLazySong(Song):
         return self._app_state
 
     @property
-    def data(self):
-        """
-        Data (shortcut for self.APP_STATE["DATA"]).
-        """
+    def data(self) -> dict[str, Any]:
+        """Data (shortcut for self.APP_STATE["DATA"])."""
         return get(self.app_state, "DATA", dict[str, Any])
 
     @property
-    def title(self):
-        """
-        Title of the song.
-        """
+    def title(self) -> str:
+        """Title of the song."""
         return get(self.data, "SNG_TITLE", str) if self.fetched else self.result["title"]
 
     @title.setter
-    def title(self, _value):
+    def title(self, _value: str) -> None:
         pass
 
     @property
-    def artists(self):
-        """
-        Artists of the song.
-        """
+    def artists(self) -> list[str]:
+        """Artists of the song."""
         return (
             [get(e, "ART_NAME", str) for e in get(self.data, "ARTISTS", list[dict[str, str]])]
             or [get(self.data, ("SNG_CONTRIBUTORS", "main_artist"), str)]
@@ -123,91 +112,75 @@ class DeezerLazySong(Song):
         )
 
     @artists.setter
-    def artists(self, _value):
+    def artists(self, _value: list[str]) -> None:
         pass
 
     @property
-    def album(self):
-        """
-        Album of the song.
-        """
+    def album(self) -> str:
+        """Album of the song."""
         return get(self.data, "ALB_TITLE", str) if self.fetched else get(self.result, ("album", "title"), str)
 
     @album.setter
-    def album(self, _value):
+    def album(self, _value: str) -> None:
         pass
 
     @property
-    def duration(self):
-        """
-        Duration of the song.
-        """
+    def duration(self) -> float:
+        """Duration of the song."""
         return get(self.data, "DURATION", float) if self.fetched else get(self.result, "duration", float)
 
     @duration.setter
-    def duration(self, _value):
+    def duration(self, _value: float) -> None:
         pass
 
     @property
-    def composers(self):
-        """
-        Composers of the song.
-        """
+    def composers(self) -> list[str]:
+        """Composers of the song."""
         return get(self.data, ("SNG_CONTRIBUTORS", "composer"), list[str])
 
     @composers.setter
-    def composers(self, _value):
+    def composers(self, _value: list[str]) -> None:
         pass
 
     @property
-    def release_date(self):
-        """
-        Release date of the song.
-        """
+    def release_date(self) -> dt.date:
+        """Release date of the song."""
         return get(self.data, "PHYSICAL_RELEASE_DATE", dt.date)
 
     @release_date.setter
-    def release_date(self, _value):
+    def release_date(self, _value: str | dt.date | None) -> None:
         pass
 
     @property
-    def isrc(self):
-        """
-        ISRC of the song.
-        """
+    def isrc(self) -> str:
+        """ISRC of the song."""
         return get(self.data, "ISRC", str)
 
     @isrc.setter
-    def isrc(self, _value):
+    def isrc(self, _value: str) -> None:
         pass
 
     @property
-    def track_number(self):
-        """
-        Track number of the song.
-        """
+    def track_number(self) -> int:
+        """Track number of the song."""
         return get(self.data, "TRACK_NUMBER", int)
 
     @track_number.setter
-    def track_number(self, _value):
+    def track_number(self, _value: int) -> None:
         pass
 
     @property
-    def copyright(self):
-        """
-        Copyright of the song.
-        """
+    def copyright(self) -> str:
+        """Copyright of the song."""
         return get(self.data, "COPYRIGHT", str).strip("©").strip()
 
     @copyright.setter
-    def copyright(self, _value):
+    def copyright(self, _value: str) -> None:
         pass
 
     @property
     def lyrics(self) -> list[tuple[str, float]]:
-        """
-        Lyrics of the song.
-        """
+        """Lyrics of the song."""
         try:
             return [
                 (get(line, "line", str), get(line, "milliseconds", int) / 1000)
@@ -221,19 +194,14 @@ class DeezerLazySong(Song):
             return []
 
     @lyrics.setter
-    def lyrics(self, _value):
+    def lyrics(self, _value: list[tuple[str, float]]) -> None:
         pass
 
 
-def download_deezer(song: str, artist: str | None = None, _market: str | None = None):
-    """
-    Fetch the Deezer search results.
-    """
+def download_deezer(song: str, artist: str | None = None, _market: str | None = None) -> list[Song]:
+    """Fetch the Deezer search results."""
     logger.info("Searching %s on Deezer...", format_query(song, artist))
-    if artist:
-        query = f"{song} {artist}"
-    else:
-        query = song
+    query = f"{song} {artist}" if artist else song
     req = locked(deezer_lock)(requests.get)("https://api.deezer.com/search/track", params={"q": query})
     try:
         # decode the JSON data
@@ -249,10 +217,7 @@ def download_deezer(song: str, artist: str | None = None, _market: str | None = 
         logger.debug("No 'data' index")
         return []  # same thing
 
-    ret: list[Song] = []
-
-    for result in results:
-        ret.append(DeezerLazySong(result))
+    ret = [DeezerLazySong(result) for result in results]
 
     logger.debug("Results:\n%s", pformat(ret))
 
