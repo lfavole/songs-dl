@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 def mp_requests() -> None:
     """Monkey-patch the `Response.iter_content` method."""
-    if hasattr(Response.iter_content, "monkeypatched"):
+    if hasattr(Response.iter_content, "monkeypatched") or True:
         return
 
     def iter_content(self: Response, *args, **kwargs) -> Generator[Any, None, None]:  # noqa: ANN002, ANN003

@@ -7,6 +7,7 @@ import sys
 from pprint import pformat
 from threading import Lock
 from typing import Any, TypedDict
+from urllib.parse import urlencode
 
 import requests
 
@@ -93,31 +94,76 @@ class YtInitialData(TypedDict):
 class YoutubeSong(Song):
     """A `Song` that is available as a YouTube video."""
 
-    def __init__(self, *args, youtube_video: YoutubeVideo, **kwargs) -> None:  # noqa: ANN002, ANN003
+    def __init__(
+        self,
+        *args,  # noqa: ANN002
+        youtube_video: str | None = None,
+        views: int | None = None,
+        artist_badge: bool | None = None,
+        **kwargs,  # noqa: ANN003
+    ) -> None:
         """Create a new `YoutubeSong`."""
         self.youtube_video = youtube_video
+        self.views = views
+        self.artist_badge = artist_badge
         super().__init__(*args, **kwargs)
 
 
-def download_youtube(song: str, artist: str | None = None, _market: str | None = None) -> list[YoutubeSong]:
+def download_youtube(song: str, artist: str | None = None, _market: str | None = None, music=False) -> list[YoutubeSong]:
     """Get the YouTube search results."""
     logger.info("Searching %s on YouTube...", format_query(song, artist))
     query = f"{song} {artist}" if artist else song
     song = f"allintitle:{song}"
-    req = locked(youtube_lock)(requests.get)("https://www.youtube.com/results", params={"search_query": query})
+    if music:
+        endpoint = "https://music.youtube.com/search"
+        param = "q"
+    else:
+        endpoint = "https://www.youtube.com/results"
+        param = "search_query"
+    with requests.Session() as session:
+        session.headers = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:139.0) Gecko/20100101 Firefox/139.0"}
+        url = endpoint + "?" + urlencode({param: query})
+        req = locked(youtube_lock)(session.get)(url)
+        if req.url.startswith("https://consent.youtube.com/"):
+            match = re.search(r"<input type=\"hidden\" name=\"bl\" value=\"([^\"]*)\"", req.text)
+            if match:
+                req = session.post(
+                    "https://consent.youtube.com/save",
+                    data={
+                        "gl": "FR",
+                        "m": "0",
+                        "app": "0",
+                        "pc": "ytm",
+                        "continue": url,
+                        "x": "6",
+                        "bl": match.group(1),
+                        "hl": "fr",
+                        "src": "1",
+                        "cm": "2",
+                        "set_eom": "true",
+                    },
+                )
     logger.debug("Page size: %d", len(req.text))
-    if not (match := re.search(r"var ytInitialData = (.*?);</script>", req.text)):
+    if music:
+        re_match = r"path: '\/search', .*?, data: '(.*?)'"
+    else:
+        re_match = r"var ytInitialData = (.*?);</script>"
+    if not (match := re.search(re_match, req.text)):
         # no YouTube video = no song => stop
         logger.error("Search failed: can't get the results in the YouTube page!")
         return []
 
     logger.info("Results have been found")
     try:
-        result = json.loads(match.group(1))
+        content = match.group(1)
+        if music:
+            content = re.sub(r"\\x([0-9a-f]{2})", lambda match: chr(int(match[1], 16)), content)
+            content = content.replace("\\\\", "\\")
+        result = json.loads(content)
         logger.debug("JSON decoding OK")
     except json.decoder.JSONDecodeError as err:
         logger.critical("JSON decoding error: %s", err)  # same thing
-        sys.exit()
+        return []
 
     main_contents = get(
         result,
@@ -212,7 +258,14 @@ def download_youtube(song: str, artist: str | None = None, _market: str | None =
 
         artists.append(ret["channel"])
 
-        return YoutubeSong(title=title, artists=artists, duration=ret["length"], youtube_video=ret)
+        return YoutubeSong(
+            title=title,
+            artists=artists,
+            duration=ret["length"],
+            youtube_video=ret["id"],
+            views=ret["views"],
+            artist_badge="BADGE_STYLE_TYPE_VERIFIED_ARTIST" in ret["badges"],
+        )
 
     ret = [map_video(v) for v in videos_list]
 

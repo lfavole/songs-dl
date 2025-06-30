@@ -18,6 +18,7 @@ dependencies = [
     "mutagen",
     "Pillow",
 	"requests",
+    "rich",
     "tqdm",
     "Unidecode",
     "yt-dlp",

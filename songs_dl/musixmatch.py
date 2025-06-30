@@ -7,11 +7,11 @@ from functools import partial
 from http import HTTPStatus
 from pprint import pformat
 from threading import Lock
-from time import sleep, time
 from typing import Any
 
 import requests
 
+from .tokens import ProviderToken, Token
 from .utils import Picture, PictureProvider, Song, format_query, get, locked
 
 logger = logging.getLogger(__name__)
@@ -38,15 +38,12 @@ class MusixmatchPictureProvider(PictureProvider):
         return pictures
 
 
-ACCESS_TOKEN = ""
-ACCESS_TOKEN_EXPIRATION = 0
+class MusixmatchToken(ProviderToken):
+    name = "musixmatch"
+    cooldown_period = 5
 
-
-def get_access_token(tries: int = 3) -> str:
-    """Get the Musixmatch access token."""
-    global ACCESS_TOKEN, ACCESS_TOKEN_EXPIRATION  # noqa: PLW0603
-
-    if not ACCESS_TOKEN_EXPIRATION or time() > ACCESS_TOKEN_EXPIRATION:
+    @classmethod
+    def real_get(cls):
         logger.info("Getting Musixmatch access token...")
         req = locked(musixmatch_lock)(requests.get)(
             "https://apic-desktop.musixmatch.com/ws/1.1/token.get",
@@ -63,20 +60,16 @@ def get_access_token(tries: int = 3) -> str:
 
         status_code = get(result, ("message", "header", "status_code"), int)
         if status_code and status_code != HTTPStatus.OK:
-            logger.warning("Musixmatch API error when getting API token, waiting...")
-            sleep(5)
-            return get_access_token(tries - 1) if tries > 0 else ""
+            logger.warning("Musixmatch API error when getting API token")
+            return
 
         token = get(result, ("message", "body", "user_token"), str)
 
         if not token:
             logger.error("Can't get the Musixmatch access token!")
-            return ""
+            return
 
-        ACCESS_TOKEN = token
-        ACCESS_TOKEN_EXPIRATION = int(time() + 10 * 60)  # 10 minutes
-
-    return ACCESS_TOKEN
+        return Token(token)
 
 
 def get_api(
@@ -92,7 +85,7 @@ def get_api(
         {
             **(params or {}),
             "app_id": "web-desktop-app-v1.0",
-            "usertoken": get_access_token(),
+            "usertoken": MusixmatchToken.get(),
         },
         *args,
         headers={
@@ -167,7 +160,10 @@ def download_musixmatch(song: str, artist: str | None = None, market: str | None
     logger.info("Searching %s on Musixmatch...", format_query(song, artist, market))
     query = f"{song} {artist}" if artist else song
 
-    data = get_api("track.search", {"q": query, "limit": 20})
+    try:
+        data = get_api("track.search", {"q": query, "limit": 20})
+    except ValueError:
+        return []
     tracks = get(data, ("message", "body", "track_list"), list)
 
     ret: list[Song] = []

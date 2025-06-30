@@ -1,36 +1,31 @@
 """Songs downloader."""
 
 import argparse
-import concurrent.futures
-import functools
 import logging
 import re
 import sys
-import traceback
 import urllib.parse
-from io import BytesIO
+from functools import partial
 from pathlib import Path
-from pprint import pformat
-from typing import TYPE_CHECKING, TypedDict, cast
+from typing import cast
 
-import mutagen.id3
+from rich import get_console
+from rich.progress import Progress
+from rich.traceback import Traceback, install as install_traceback
 from yt_dlp.utils import sanitize_filename
 
-try:
-    from PIL import Image
-except ImportError:
-    Image = None
-
 from .deezer import download_deezer
+from .display import Action, ActionsGroup
 from .itunes import download_itunes
+from .lrclib import download_lrclib
 from .monkeypatch_requests import mp_requests
+from .musicbrainz import download_musicbrainz
 from .musixmatch import download_musixmatch
-from .utils import Picture, Song, merge_dicts, order_results
+from .tags import add_tags
+from .utils import Song, order_results
 from .youtube import YoutubeSong, download_youtube
 from .youtube_dl import download_youtube_dl
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
+from .ytmusic import download_youtube_music
 
 __version__ = "0.2.2"
 
@@ -61,168 +56,86 @@ def parse_query(query: str) -> tuple[str, str | None, str | None]:
     return song, artist, market
 
 
-def get_image_mimetype(mimetype: str | None, url: str) -> str:
-    """Get image MIME type with its `Content-Type` header or its file extension."""
-    if mimetype and mimetype.removeprefix("image/"):
-        return mimetype
-    ext = url.rsplit(".", 1)[-1].replace("jpg", "jpeg")
-    if ext not in {"jpeg", "png", "gif", "webp"}:
-        ext = "jpeg"
-    return "image/" + ext
-
-
-class TagParams(TypedDict, total=False):
-    """Dict with ID3 tags to be passed to `mutagen`."""
-
-    encoding: int
-    text: str
-    lang: str
-
-    type: int
-    desc: str
-    mime: str
-    data: bytes
-
-
-def _get_apic_tag(value: list[Picture]) -> TagParams:
-    params = {}
-    # we try all the pictures
-    for picture in sorted(value, key=lambda e: e.size, reverse=True):
-        data = picture.download()
-        if data is False:
-            continue
-        params["type"] = 3
-        params["desc"] = picture.url
-        params["mime"] = get_image_mimetype(
-            mimetype=picture.req.headers.get("Content-Type"), url=picture.url
-        )
-        params["data"] = data
-        if Image is not None:
-            try:
-                img = Image.open(BytesIO(data))
-                img.thumbnail((1200, 1200))
-                output = BytesIO()
-                img.save(output, format="jpeg")
-                params["mime"] = "image/jpg"
-                params["data"] = output.getvalue()
-            except OSError:
-                pass
-
-    return params
-
-
-def add_tags(results: dict[str, list[Song]], filename: str) -> tuple[str, str, dict[str, list[str]]]:
-    """Add ID3 tags to a song."""
-    # we don't need to load the file's tags (we replace them)
-    # so there is no filename here
-    tags = mutagen.id3.ID3()
-
-    # tags (spotify -> itunes -> musixmatch -> deezer -> youtube)
-    tags_list = merge_dicts(
-        results["spotify"][0].to_id3(),
-        results["itunes"][0].to_id3(),
-        results["musixmatch"][0].to_id3(),
-        results["deezer"][0].to_id3(),
-        results["youtube_dl"][0].to_id3(),
-        results["youtube"][0].to_id3(),
-    )
-    tags_list = {key: [value for value in values if value] for key, values in tags_list.items()}
-
-    logger.debug("ID3 tags:\n%s", "\n".join([f"{a}: {pformat(b)}" for a, b in tags_list.items()]))
-
-    title = ""
-    artist = ""
-    for tag_name, value in tags_list.items():
-        params: TagParams = {"encoding": 3}
-        if tag_name == "APIC":
-            params.update(_get_apic_tag(value))
-        elif tag_name == "COMM":
-            params["text"] = "\n\n".join(value)  # join all the comments
-        elif tag_name == "SYLT":
-            params["text"] = value[0]  # use SYLT as is (list of tuples), will be handled correctly by Mutagen
-        else:
-            params["text"] = str(value[0])  # stringify anything else
-        if tag_name == "TIT2":
-            title = params["text"]
-        elif tag_name == "TPE1":
-            artist = params["text"]
-        elif tag_name == "COMM":
-            params["lang"] = "eng"
-        elif tag_name == "USLT":
-            params["lang"] = [*tags_list.get("TLAN", []), ""][0] or "eng"
-        tags[tag_name] = getattr(mutagen.id3, tag_name)(**params)
-
-    tags.save(filename, v2_version=3)
-
-    return title, artist, tags_list
-
-
-def download_song(query: str) -> str | None:
+def download_song(query: str, progress: Progress | None = None, parent: ActionsGroup | None = None) -> str | None:
     """Download a song with ID3 tags (title, artist, lyrics...). Return the path of the song or `None`."""
+    install_traceback(show_locals=True)
+
     logger.info("Downloading '%s'", query)
 
     song, artist, market = parse_query(query)
 
-    results: dict[str, list[Song]] = {
-        "spotify": [],
-        "itunes": [],
-        "musixmatch": [],
-        "deezer": [],
-        "youtube": [],
-    }
-    actions: dict[str, Callable[[str], list[Song]]] = {
-        "itunes": download_itunes,
-        "musixmatch": download_musixmatch,
-        "deezer": download_deezer,
-        "youtube": download_youtube,
-    }
-
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        future_to_action = {executor.submit(func, song, artist, market): action for action, func in actions.items()}
-        for future in concurrent.futures.as_completed(future_to_action):
-            provider = future_to_action[future]
-            try:
-                results[provider] = future.result()
-            except:  # noqa: E722
-                print(f"Error when executing {provider}:", file=sys.stderr)
-                traceback.print_exc()
-            if provider == "youtube" and len(results[provider]) == 0:
-                logger.error("No videos available!")
-                for future_to_cancel in future_to_action:
-                    future_to_cancel.cancel()
-                return None
-
     # Providers sorted by confidence
-    best_providers = ["spotify", "itunes", "musixmatch", "deezer", "youtube"]
+    metadata_actions: ActionsGroup[list[Song]] = ActionsGroup(
+        "Fetching metadata...",
+        [
+            Action("iTunes", download_itunes),
+            Action("YouTube Music", download_youtube_music),
+            Action("MusicBrainz", download_musicbrainz),
+            Action("Musixmatch", download_musixmatch),
+            Action("LRCLIB", download_lrclib),
+            Action("Deezer", download_deezer),
+            Action("YouTube", download_youtube),
+        ],
+        expandable=True,
+        no_task=True,
+    )
 
-    def get_best_songs(not_provider: str) -> list[Song]:
-        return [
-            item[1]
-            for item in sorted(
-                [(action, songs[0]) for action, songs in results.items() if action != not_provider and songs],
-                key=lambda item: best_providers.index(item[0]),
-            )
-        ]
+    ytdl_action = ActionsGroup("Downloading...")
+    add_tags_action = Action("Adding tags...")
+
+    actions: ActionsGroup[list[Song]] = ActionsGroup(
+        query,
+        [
+            metadata_actions,
+            ytdl_action,
+            add_tags_action,
+        ],
+        {metadata_actions: 3, ytdl_action: 2, add_tags_action: 1},
+        progress=progress,
+        expandable=True,
+        calibrate=True,
+    )
+    actions.parent = parent
+    metadata_actions(song, artist, market)
+
+    # Display the results in order
+    for action in metadata_actions:
+        if action.error:
+            print(f"Error when executing {action.description}:", file=sys.stderr)
+            if logger.isEnabledFor(logging.INFO):
+                get_console().print(
+                    Traceback.from_exception(type(action.error), action.error, action.error.__traceback__)
+                )
+            else:
+                print(f"{type(action.error).__name__}: {action.error}", file=sys.stderr)
+        else:
+            action.logs.handle_all()
+
+    def get_best_songs(not_action: Action[list[Song]]) -> list[Song]:
+        return [action.results[0] for action in metadata_actions if action != not_action and action and action.results]
+
+    best_video = None
 
     # order the results
-    for provider, songs in results.items():
-        if provider != "spotify":
-            results[provider] = songs = order_results(provider, get_best_songs(provider), results)
-        if len(songs) == 0:
-            songs.append(Song.empty())
+    for action in metadata_actions:
+        action.results = order_results(action.description, get_best_songs(action), action.results)
+        if action._description in ("YouTube", "YouTube Music"):
+            if action.results:
+                best_video = best_video or cast("YoutubeSong", action.results[0])
+        else:
+            if not action.results:
+                action.results.append(Song.empty())
 
-    if not results["youtube"]:
+    if not best_video:
         logger.error("No videos available!")
         return None
-    best_video = cast("YoutubeSong", results["youtube"][0])
 
-    filename, youtube_song = download_youtube_dl(
-        f"https://www.youtube.com/watch?v={urllib.parse.quote(best_video.youtube_video['id'])}"
+    filename = download_youtube_dl(
+        f"https://www.youtube.com/watch?v={urllib.parse.quote(best_video.youtube_video)}",
+        ytdl_action,
     )
-    # add the metadata from the YouTube page
-    results["youtube_dl"] = [youtube_song]
 
-    title, artist, tags_list = add_tags(results, filename)
+    title, artist, tags_list = add_tags(metadata_actions, filename)
 
     if artist and title:
         final_filename = sanitize_filename(f"{artist} - {title}.mp3")
@@ -233,6 +146,11 @@ def download_song(query: str) -> str | None:
 
     if "USLT" in tags_list:
         Path(final_filename.rsplit(".", 1)[0] + ".lrc").write_text(tags_list["USLT"][0] + "\n", "utf-8")
+
+    add_tags_action.completed = 1
+    add_tags_action.total = 1
+
+    logger.info("'%s' downloaded", query)
 
     return final_filename
 
@@ -247,7 +165,7 @@ def main() -> None:
         default=10,
         help="number of songs to download in the same time",
     )
-    parser.add_argument("-v", "--verbose", action="count", help="show more information")
+    parser.add_argument("-v", "--verbose", action="count", default=0, help="show more information")
 
     args = parser.parse_args()
 
@@ -261,16 +179,24 @@ def main() -> None:
 
     mp_requests()
 
-    ret = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=args.max_workers) as executor:
-        future_to_song = {executor.submit(download_song, song): song for song in args.SONG}
-        for future in concurrent.futures.as_completed(future_to_song):
-            song = future_to_song[future]
-            try:
-                ret.append(future.result())
-            except:  # noqa: E722
-                print(f"Error when downloading '{song}':", file=sys.stderr)
-                traceback.print_exc()
+    if not args.SONG:
+        return
+
+    # If there is only one song, download it on the main thread
+    with Progress(transient=True) as progress:
+        if len(args.SONG) == 1:
+            download_song(args.SONG[0], progress)
+            return
+
+        actions = ActionsGroup(
+            "Downloading songs...",
+            progress=progress,
+            expandable=True,
+            max_workers=args.max_workers,
+        )
+        for song in args.SONG:
+            actions.add_action(Action(song, partial(download_song, song, parent=actions)))
+        actions()
 
 
 if __name__ == "__main__":

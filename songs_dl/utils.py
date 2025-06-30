@@ -126,29 +126,41 @@ def get(obj: dict[str, Any] | Sequence[Any], *paths: Any, expected: ExpectedT) -
 def get(obj: Any, *paths: Any, expected: None = ...) -> Any: ...  # noqa: ANN401
 
 
-def get(obj, *paths, expected=None, expected_type=None, **kwargs):
+def get(data, *paths, default_type=None):
     """
     Safely traverse nested `dict`s and `Sequence`s.
-
-    Work around to force the return value to have the correct type.
-
-    See `yt_dlp.utils.traverse_obj` docstring for more information.
     """
-    expected = expected or expected_type
-    if not expected and (get_base_type(paths[-1]) or callable(paths[-1])):
-        expected = paths[-1]
+    if not default_type and (get_base_type(paths[-1]) or callable(paths[-1])):
+        default_type = paths[-1]
         paths = paths[:-1]
-    if expected:
-        expected = get_base_type(expected)
-    ret = traverse_obj(
-        obj,
-        *paths,
-        expected_type=expected,
-        **kwargs,
-    )
-    if ret is None and expected:
-        return instantiate(expected)
-    return ret
+
+    # Navigate through the nested dictionary using the keys
+    for keys in paths:
+        if isinstance(keys, str):
+            keys = [keys]
+        try:
+            for key in keys:
+                if isinstance(data, dict) and key in data or isinstance(data, list):
+                    data = data[key]
+                else:
+                    # If the key is not found, return the default value
+                    if default_type is not None:
+                        break
+                    return None  # or raise an exception if preferred
+        except:
+            continue
+
+        if default_type and callable(default_type):
+            try:
+                return default_type(data)
+            except:
+                pass
+        else:
+            # If a default type is specified and the value is not of that type, continue
+            if default_type is None or isinstance(data, get_base_type(default_type)):
+                return data
+
+    return instantiate(default_type)
 
 
 def instantiate(target_type: type[ExpectedT] | Callable[[Any], ExpectedT]) -> ExpectedT | None:
@@ -174,11 +186,14 @@ def instantiate(target_type: type[ExpectedT] | Callable[[Any], ExpectedT]) -> Ex
 F = TypeVar("F", bound=Callable)
 
 
-def ratio(string1, string2):
-    return difflib.SequenceMatcher(None, string1, string2).ratio()
+def ratio(string1, string2, min=0):
+    ret = difflib.SequenceMatcher(None, string1, string2).ratio()
+    if ret < min:
+        return 0
+    return ret
 
 
-def partial_ratio(string1, string2):
+def partial_ratio(string1, string2, min=0):
     # Find the longest match
     seq_matcher = difflib.SequenceMatcher(None, string1, string2)
     match = seq_matcher.find_longest_match(0, len(string1), 0, len(string2))
@@ -192,7 +207,10 @@ def partial_ratio(string1, string2):
     matched_string1 = string1[match.a: match.a + match_length]
     matched_string2 = string2[match.b: match.b + match_length]
 
-    return difflib.SequenceMatcher(None, matched_string1, matched_string2).ratio()
+    ret = difflib.SequenceMatcher(None, matched_string1, matched_string2).ratio()
+    if ret < min:
+        return 0
+    return ret
 
 
 class Picture:
@@ -596,11 +614,6 @@ def _normalize_sentence(string: str) -> str:
     return " ".join(_get_sentence_words(re.sub(r"(?i)\(.*?\)|-\s+.*|feat", "", string)))
 
 
-def get_provider_name(provider: str) -> str:
-    """Return the human name of a provider."""
-    return {"itunes": "iTunes", "youtube": "YouTube"}.get(provider, provider.title())
-
-
 DISCARD_RE = re.compile(
     r"""(?xi)
     \d+ h(?:our)?s?\b
@@ -623,10 +636,10 @@ DISCARD_RE = re.compile(
 )
 
 
-def order_results(provider: str, best_items: list[Song], results: dict[str, list[Song]] | None) -> list[Song]:
+def order_results(provider: str, best_items: list[Song], results: list[Song] | None) -> list[Song]:
     """Order the results: choose the result that is the most similar to the Spotify / Deezer song."""
     if not results:
-        return best_items
+        return []
 
     best_item = Song.merge(best_items)
 
@@ -639,7 +652,7 @@ def order_results(provider: str, best_items: list[Song], results: dict[str, list
         title = re.sub(r"(?<=\wn)\W+t", r"t", title)
         return title  # noqa: RET504
 
-    for result in results[provider]:
+    for result in results:
         # check for common word
         song_title = normalize_title(result.title)
         best_title = normalize_title(best_item.title)
@@ -653,7 +666,7 @@ def order_results(provider: str, best_items: list[Song], results: dict[str, list
         all_r_artists = _normalize_sentence(" ".join(result.artists))
 
         artist_match_number = sum(
-            1 if partial_ratio(_normalize_sentence(sp_artist), all_r_artists, 85) else 0
+            1 if partial_ratio(_normalize_sentence(sp_artist), all_r_artists, 0.85) else 0
             for sp_artist in best_item.artists
         )
 
@@ -666,7 +679,7 @@ def order_results(provider: str, best_items: list[Song], results: dict[str, list
         name_match = ratio(
             str(unidecode(best_title.lower())),
             str(unidecode(song_title.lower())),
-            60,
+            0.6,
         )
 
         official_match = (
@@ -678,10 +691,8 @@ def order_results(provider: str, best_items: list[Song], results: dict[str, list
             )
             * 100
         )
-        if not official_match and hasattr(result, "youtube_video"):
-            official_match += (
-                100 if "BADGE_STYLE_TYPE_VERIFIED_ARTIST" in result.youtube_video["badges"] else 0
-            )
+        if not official_match and hasattr(result, "artist_badge"):
+            official_match += 100 if result.artist_badge else 0
         if official_match:
             official_match += len(re.findall(r"(?i)\baudio\b", song_title)) * 100
 
@@ -695,7 +706,7 @@ def order_results(provider: str, best_items: list[Song], results: dict[str, list
 
         time_match = max(100 - non_match_value, 0)
 
-        views_match = math.log10(result.youtube_video["views"]) / 10 * 100 if hasattr(result, "youtube_video") else 50
+        views_match = math.log10(result.views) / 10 * 100 if getattr(result, "views", 0) else 50
 
         discard_match = (len(DISCARD_RE.findall(song_title)) + len(DISCARD_RE.findall(all_r_artists))) * -100
 
@@ -723,7 +734,7 @@ def order_results(provider: str, best_items: list[Song], results: dict[str, list
     ret = sorted(ret, key=operator.itemgetter(1), reverse=True)
     logger.debug(
         "%s sorted results:\n%s",
-        get_provider_name(provider),
+        provider,
         "\n".join([f"{el[1]} ({' '.join(str(round(e, 3)) for e in el[2])}): {el[0]}" for el in ret]),
     )
     return [el[0] for el in ret]
@@ -763,3 +774,16 @@ def locked(lock: Lock) -> Callable[[AnyFunction], AnyFunction]:
 def format_query(song: str, artist: str | None = None, market: str | None = None) -> str:
     """Return a formatted version of `song`, `artist` and `market` (for logging)."""
     return f"'{song}'" + (f" - '{artist}'" if artist else "") + (f" on '{market}' market" if market else "")
+
+
+# https://stackoverflow.com/a/17246726
+def get_all_subclasses(cls: type):
+    """Return all the subclasses of a given class."""
+    all_subclasses = []
+
+    for subclass in cls.__subclasses__():
+        all_subclasses.append(subclass)
+        all_subclasses.extend(get_all_subclasses(subclass))
+
+    # https://stackoverflow.com/a/7961390
+    return [*dict.fromkeys(all_subclasses)]
