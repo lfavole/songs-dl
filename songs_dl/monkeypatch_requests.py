@@ -12,7 +12,7 @@ def mp_requests() -> None:
     if hasattr(Response.iter_content, "monkeypatched") or True:
         return
 
-    def iter_content(self: Response, *args, **kwargs) -> Generator[Any, None, None]:  # noqa: ANN002, ANN003
+    def iter_content(self: Response, *args, **kwargs) -> Generator[Any, None, None]:
         pb = tqdm(unit_scale=True, unit="B")
         if "Content-Length" in self.headers:
             pb.total = int(self.headers["Content-Length"])

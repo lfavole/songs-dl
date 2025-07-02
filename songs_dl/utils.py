@@ -25,7 +25,6 @@ from typing import (
 import mutagen.id3
 import requests
 from unidecode import unidecode as unidecode_py
-from yt_dlp.utils import traverse_obj
 
 try:
     from PIL import Image
@@ -38,9 +37,7 @@ AnyDictKey = TypeVar("AnyDictKey")
 AnyT = TypeVar("AnyT")
 
 
-def merge_dicts(
-    *args: dict[AnyDictKey, AnyT], merge_lists: bool | None = False
-) -> dict[AnyDictKey, list[AnyT]]:
+def merge_dicts(*args: dict[AnyDictKey, AnyT], merge_lists: bool | None = False) -> dict[AnyDictKey, list[AnyT]]:
     """
     Merge many dicts and return a dict with arrays containing all values.
 
@@ -126,10 +123,8 @@ def get(obj: dict[str, Any] | Sequence[Any], *paths: Any, expected: ExpectedT) -
 def get(obj: Any, *paths: Any, expected: None = ...) -> Any: ...  # noqa: ANN401
 
 
-def get(data, *paths, default_type=None):
-    """
-    Safely traverse nested `dict`s and `Sequence`s.
-    """
+def get(data, *paths, default_type=None):  # noqa: C901
+    """Safely traverse nested `dict`s and `Sequence`s."""
     if not default_type and (get_base_type(paths[-1]) or callable(paths[-1])):
         default_type = paths[-1]
         paths = paths[:-1]
@@ -137,28 +132,27 @@ def get(data, *paths, default_type=None):
     # Navigate through the nested dictionary using the keys
     for keys in paths:
         if isinstance(keys, str):
-            keys = [keys]
+            keys = [keys]  # noqa: PLW2901
         try:
             for key in keys:
-                if isinstance(data, dict) and key in data or isinstance(data, list):
+                if (isinstance(data, dict) and key in data) or isinstance(data, list):
                     data = data[key]
                 else:
                     # If the key is not found, return the default value
                     if default_type is not None:
                         break
                     return None  # or raise an exception if preferred
-        except:
+        except Exception:  # noqa: BLE001, S112
             continue
 
         if default_type and callable(default_type):
             try:
                 return default_type(data)
-            except:
+            except Exception:  # noqa: BLE001, S110
                 pass
-        else:
+        elif default_type is None or isinstance(data, get_base_type(default_type)):
             # If a default type is specified and the value is not of that type, continue
-            if default_type is None or isinstance(data, get_base_type(default_type)):
-                return data
+            return data
 
     return instantiate(default_type)
 
@@ -186,14 +180,16 @@ def instantiate(target_type: type[ExpectedT] | Callable[[Any], ExpectedT]) -> Ex
 F = TypeVar("F", bound=Callable)
 
 
-def ratio(string1, string2, min=0):
+def ratio(string1: str, string2: str, minimum: float = 0) -> float:
+    """Return the ratio of similarity between two strings."""
     ret = difflib.SequenceMatcher(None, string1, string2).ratio()
-    if ret < min:
+    if ret < minimum:
         return 0
     return ret
 
 
-def partial_ratio(string1, string2, min=0):
+def partial_ratio(string1: str, string2: str, minimum: float = 0) -> float:
+    """Return the ratio of similarity between two strings, based on the longest match."""
     # Find the longest match
     seq_matcher = difflib.SequenceMatcher(None, string1, string2)
     match = seq_matcher.find_longest_match(0, len(string1), 0, len(string2))
@@ -204,11 +200,11 @@ def partial_ratio(string1, string2, min=0):
         return 0.0
 
     # Calculate the ratio based on the longest match
-    matched_string1 = string1[match.a: match.a + match_length]
-    matched_string2 = string2[match.b: match.b + match_length]
+    matched_string1 = string1[match.a : match.a + match_length]
+    matched_string2 = string2[match.b : match.b + match_length]
 
     ret = difflib.SequenceMatcher(None, matched_string1, matched_string2).ratio()
-    if ret < min:
+    if ret < minimum:
         return 0
     return ret
 
@@ -263,7 +259,7 @@ class Picture:
         """Size of the image (smallest dimension)."""
         return min(self.width, self.height)
 
-    def check(self) -> None:
+    def check(self) -> bool:
         """Check if the picture exists (without downloading it, if possible)."""
         if self.sure:
             return True
@@ -384,13 +380,17 @@ class TagsList(TypedDict, total=False):
 
 class Artists:
     """An artists list from MusicBrainz."""
-    def __init__(self, mb_data):
+
+    def __init__(self, mb_data: list[dict[str, Any]]) -> None:
+        """Create a new `Artists` object from MusicBrainz data."""
         self.mb_data = mb_data
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
+        """Return `True` if the artists list is not empty, `False` otherwise."""
         return len(self.mb_data) > 0
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """Return the string representation of the artists list."""
         ret = ""
         previous = None
         for artist in self.mb_data:
@@ -636,7 +636,7 @@ DISCARD_RE = re.compile(
 )
 
 
-def order_results(provider: str, best_items: list[Song], results: list[Song] | None) -> list[Song]:
+def order_results(provider: str, best_items: list[Song], results: list[Song] | None) -> list[Song]:  # noqa: PLR0914
     """Order the results: choose the result that is the most similar to the Spotify / Deezer song."""
     if not results:
         return []
@@ -720,7 +720,8 @@ def order_results(provider: str, best_items: list[Song], results: list[Song] | N
                 + time_match * 3
                 + views_match * 0.5
                 + discard_match * 2
-            ) / 11.5,
+            )
+            / 11.5,
             ndigits=3,
         )
 
@@ -758,7 +759,7 @@ def locked(lock: Lock) -> Callable[[AnyFunction], AnyFunction]:
 
     def decorator(f: AnyFunction) -> AnyFunction:
         @functools.wraps(f)
-        def wrapper(*args, **kwargs) -> Any:  # noqa: ANN002, ANN003, ANN401
+        def wrapper(*args, **kwargs) -> Any:  # noqa: ANN401
             lock.acquire()
             try:
                 return f(*args, **kwargs)
@@ -777,7 +778,7 @@ def format_query(song: str, artist: str | None = None, market: str | None = None
 
 
 # https://stackoverflow.com/a/17246726
-def get_all_subclasses(cls: type):
+def get_all_subclasses(cls: type) -> list[type]:
     """Return all the subclasses of a given class."""
     all_subclasses = []
 

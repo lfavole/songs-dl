@@ -54,7 +54,7 @@ class DeezerPictureProvider(PictureProvider):
 class DeezerLazySong(Song):
     """Deezer song with lazy request to the Deezer song page (with lyrics...) when needed."""
 
-    def __init__(self, result: dict[str, Any], *args, **kwargs) -> None:  # noqa: ANN002, ANN003
+    def __init__(self, result: dict[str, Any], *args, **kwargs) -> None:
         """Create a `DeezerLazySong`."""
         self.result = result
 

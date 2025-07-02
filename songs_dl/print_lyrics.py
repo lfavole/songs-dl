@@ -1,4 +1,5 @@
 """Create a PDF containing the lyrics of the given song."""
+
 import argparse
 from pathlib import Path
 

@@ -2,7 +2,6 @@
 
 import datetime as dt
 import logging
-from collections import defaultdict
 from typing import Any
 
 from yt_dlp.postprocessor import (
@@ -21,7 +20,8 @@ from .youtube import youtube_lock
 logger = logging.getLogger(__name__)
 
 
-def ponderate(action: Action[list]):
+def ponderate(action: Action[list]) -> float:
+    """Return the ponderation for a given action based on its type."""
     pp_key = action.description
 
     if pp_key == "downloading":
@@ -32,16 +32,15 @@ def ponderate(action: Action[list]):
         if pp_to_try.pp_key() == pp_key:
             pp = pp_to_try
 
-    if not pp:
-        return 1
-    if issubclass(pp, FFmpegMergerPP):
-        return 6
-    if issubclass(pp, FFmpegExtractAudioPP):
-        return 3
-    if issubclass(pp, FFmpegPostProcessor):
-        return 2
-    if issubclass(pp, MoveFilesAfterDownloadPP):
-        return 0.5
+    if pp:
+        if issubclass(pp, FFmpegMergerPP):
+            return 6
+        if issubclass(pp, FFmpegExtractAudioPP):
+            return 3
+        if issubclass(pp, FFmpegPostProcessor):
+            return 2
+        if issubclass(pp, MoveFilesAfterDownloadPP):
+            return 0.5
     return 1
 
 
@@ -55,11 +54,11 @@ def download_youtube_dl(url: str, ytdl_action: ActionsGroup[list]) -> str:
 
     last_data = {}
 
-    def fix_description():
+    def fix_description() -> None:
         status = "Downloaded"
         for action in ytdl_action.actions:
             if action.completed != action.total:
-                status = action._description + "..."
+                status = action._description + "..."  # noqa: SLF001
                 break
 
         ytdl_action.description = status
@@ -74,7 +73,7 @@ def download_youtube_dl(url: str, ytdl_action: ActionsGroup[list]) -> str:
         ytdl_action.add_action(action)
         return action
 
-    def progress_hook(data: dict[str, Any]):
+    def progress_hook(data: dict[str, Any]) -> None:
         nonlocal last_data
         last_data = {**data, "progress_action": ytdl_action}
 
@@ -86,7 +85,7 @@ def download_youtube_dl(url: str, ytdl_action: ActionsGroup[list]) -> str:
         if data["status"] == "finished" and youtube_lock.locked():
             youtube_lock.release()
 
-    def postprocessor_hook(data: dict[str, Any]):
+    def postprocessor_hook(data: dict[str, Any]) -> None:
         nonlocal filename, info_dict, ytdl_action
         info_dict = data["info_dict"]
         filename = info_dict.get("filepath") or filename

@@ -31,17 +31,16 @@ def download_lrclib(song: str, artist: str | None = None, market: str | None = N
         logger.debug("JSON decoding error: %s", err)
         return []
 
-    ret: list[Song] = []
-    for element in result:
-        ret.append(
-            Song(
-                title=get(element, "trackName", str),
-                artists=[get(element, "artistName", str)],
-                album=get(element, "albumName", ""),
-                duration=get(element, "duration", float),
-                lyrics=get(element, "syncedLyrics", str),
-            )
+    ret: list[Song] = [
+        Song(
+            title=get(element, "trackName", str),
+            artists=[get(element, "artistName", str)],
+            album=get(element, "albumName", ""),
+            duration=get(element, "duration", float),
+            lyrics=get(element, "syncedLyrics", str),
         )
+        for element in result
+    ]
 
     logger.debug("Results:\n%s", pformat(ret))
 

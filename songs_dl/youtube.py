@@ -3,7 +3,6 @@
 import json
 import logging
 import re
-import sys
 from pprint import pformat
 from threading import Lock
 from typing import Any, TypedDict
@@ -96,11 +95,11 @@ class YoutubeSong(Song):
 
     def __init__(
         self,
-        *args,  # noqa: ANN002
+        *args,
         youtube_video: str | None = None,
         views: int | None = None,
         artist_badge: bool | None = None,
-        **kwargs,  # noqa: ANN003
+        **kwargs,
     ) -> None:
         """Create a new `YoutubeSong`."""
         self.youtube_video = youtube_video
@@ -109,7 +108,9 @@ class YoutubeSong(Song):
         super().__init__(*args, **kwargs)
 
 
-def download_youtube(song: str, artist: str | None = None, _market: str | None = None, music=False) -> list[YoutubeSong]:
+def download_youtube(  # noqa: C901, PLR0915
+    song: str, artist: str | None = None, _market: str | None = None, music: bool = False
+) -> list[YoutubeSong]:
     """Get the YouTube search results."""
     logger.info("Searching %s on YouTube...", format_query(song, artist))
     query = f"{song} {artist}" if artist else song
@@ -144,10 +145,7 @@ def download_youtube(song: str, artist: str | None = None, _market: str | None =
                     },
                 )
     logger.debug("Page size: %d", len(req.text))
-    if music:
-        re_match = r"path: '\/search', .*?, data: '(.*?)'"
-    else:
-        re_match = r"var ytInitialData = (.*?);</script>"
+    re_match = r"path: '\/search', .*?, data: '(.*?)'" if music else r"var ytInitialData = (.*?);</script>"
     if not (match := re.search(re_match, req.text)):
         # no YouTube video = no song => stop
         logger.error("Search failed: can't get the results in the YouTube page!")

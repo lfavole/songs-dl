@@ -39,11 +39,14 @@ class MusixmatchPictureProvider(PictureProvider):
 
 
 class MusixmatchToken(ProviderToken):
+    """A token provider for Musixmatch."""
+
     name = "musixmatch"
     cooldown_period = 5
 
     @classmethod
-    def real_get(cls):
+    def real_get(cls) -> Token | None:
+        """Get the Musixmatch access token."""
         logger.info("Getting Musixmatch access token...")
         req = locked(musixmatch_lock)(requests.get)(
             "https://apic-desktop.musixmatch.com/ws/1.1/token.get",
@@ -56,18 +59,18 @@ class MusixmatchToken(ProviderToken):
             logger.debug("JSON decoding OK")
         except requests.JSONDecodeError as err:
             logger.debug("JSON decoding error: %s", err)
-            return ""
+            return None
 
         status_code = get(result, ("message", "header", "status_code"), int)
         if status_code and status_code != HTTPStatus.OK:
             logger.warning("Musixmatch API error when getting API token")
-            return
+            return None
 
         token = get(result, ("message", "body", "user_token"), str)
 
         if not token:
             logger.error("Can't get the Musixmatch access token!")
-            return
+            return None
 
         return Token(token)
 
@@ -76,8 +79,8 @@ def get_api(
     url: str,
     params: dict[str, Any] | None = None,
     headers: dict[str, Any] | None = None,
-    *args,  # noqa: ANN002
-    **kwargs,  # noqa: ANN003
+    *args,
+    **kwargs,
 ) -> dict[str, Any]:
     """Make a call to the Musixmatch API."""
     resp = locked(musixmatch_lock)(requests.get)(
@@ -124,6 +127,7 @@ def get_lyrics(track_id: int) -> str:
 
 def lazy_string(func: Callable[[], str]) -> str:
     """Return an object that looks like a string and will call the passed function when needed."""
+
     class LazyString:
         def __init__(self) -> None:
             self._data: str | None = None

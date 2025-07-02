@@ -1,8 +1,11 @@
 """Functions to get metadata from MusicBrainz."""
 
 import logging
+from collections import UserList
+from collections.abc import Callable, Iterator
 from pprint import pformat
 from threading import Lock
+from typing import Generic, ParamSpec, TypeVar
 
 import requests
 
@@ -11,28 +14,33 @@ from .utils import Artists, Picture, PictureProvider, Song, format_query, get, l
 logger = logging.getLogger(__name__)
 musicbrainz_lock = Lock()
 
+P = ParamSpec("P")
+T = TypeVar("T")
 
-class LazyList(list):
+
+class LazyList(UserList, Generic[T]):
     """A list that is lazily evaluated."""
 
-    def __init__(self, func, *args, **kwargs):
+    def __init__(self, func: Callable[P, list[T]], *args, **kwargs) -> None:
         """Create a `LazyList`."""
         super().__init__()
         self._func = func
         self._args = args
         self._kwargs = kwargs
 
-    def _evaluate(self):
+    def _evaluate(self) -> None:
         """Evaluate the lazy list."""
         if self._func:
             self.extend(self._func(*self._args, **self._kwargs))
             self._func = None
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int | slice) -> T | list[T]:
+        """Get an item from the lazy list."""
         self._evaluate()
         return super().__getitem__(index)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[T]:
+        """Iterate over the lazy list."""
         self._evaluate()
         return super().__iter__()
 
@@ -40,17 +48,21 @@ class LazyList(list):
 class MusicBrainzPictureProvider(PictureProvider):
     """Picture provider for MusicBrainz."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
+        """Initialize the MusicBrainz picture provider."""
         super().__init__(*args, **kwargs)
         self._data = None
 
     @property
-    def data(self):
+    def data(self) -> dict:
+        """The data from MusicBrainz cover art archive."""
         if self._data is not None:
             return self._data
         self._data = {}
         logger.info("Downloading MusicBrainz cover art for %s...", get(self.result, "name", str))
-        req = locked(musicbrainz_lock)(requests.get)("https://coverartarchive.org/release/" + get(self.result, "id", str))
+        req = locked(musicbrainz_lock)(requests.get)(
+            "https://coverartarchive.org/release/" + get(self.result, "id", str)
+        )
         try:
             self._data = req.json()
             logger.debug("JSON decoding OK")
@@ -58,8 +70,10 @@ class MusicBrainzPictureProvider(PictureProvider):
             logger.debug("JSON decoding error")
         return self._data
 
-    def get_sure_pictures(self) -> list[Picture]:  # noqa: D102
-        def real_get_pictures():
+    def get_sure_pictures(self) -> LazyList[Picture]:
+        """Get the pictures from MusicBrainz cover art archive."""
+
+        def real_get_pictures() -> list[Picture]:
             front_cover = None
             for cover in get(self.data, "images", list):
                 if get(cover, "front", bool):
@@ -67,10 +81,7 @@ class MusicBrainzPictureProvider(PictureProvider):
                     break
             else:
                 return []
-            return [
-                Picture(url, int(size), int(size))
-                for size, url in get(front_cover, "thumbnails", dict).items()
-            ]
+            return [Picture(url, int(size), int(size)) for size, url in get(front_cover, "thumbnails", dict).items()]
 
         return LazyList(real_get_pictures)
 
@@ -78,13 +89,13 @@ class MusicBrainzPictureProvider(PictureProvider):
 def download_musicbrainz(song: str, artist: str | None = None, market: str | None = None) -> list[Song]:
     """Fetch the MusicBrainz search results."""
     logger.info("Searching %s on MusicBrainz...", format_query(song, artist, market))
+
     def escape_quotes(text: str) -> str:
         """Escape quotes in the text."""
         return text.replace('"', '\\"')
+
     params = {
-        "query": f'recording:"{escape_quotes(song)}"' + (
-            f' artist:"{escape_quotes(artist)}"' if artist else ""
-        ),
+        "query": f'recording:"{escape_quotes(song)}"' + (f' artist:"{escape_quotes(artist)}"' if artist else ""),
         "fmt": "json",
     }
     if market:
@@ -102,8 +113,11 @@ def download_musicbrainz(song: str, artist: str | None = None, market: str | Non
         logger.debug("JSON decoding error: %s", err)
         return []
 
-    def get_best_album(albums):
-        def is_va(artist):
+    def get_best_album(albums: list) -> dict | None:
+        """Get the best album from the list of albums."""
+
+        def is_va(artist: dict) -> bool:
+            """Check if the artist is a VA (various artists)."""
             return (
                 get(artist, ("artist", "id"), str) == "89ad4ac3-39f7-470e-963a-56509c546377"
                 or get(artist, "name", str) == "various artists"

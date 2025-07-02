@@ -19,7 +19,7 @@ def sizeof_fmt(num: float, suffix: str = "B") -> str:
     return f"{num:.1f}Yi{suffix}"
 
 
-current_build = sp.check_output(["git", "rev-parse", "--short", "HEAD"], text=True)  # noqa: S603, S607
+current_build = sp.check_output(["git", "rev-parse", "--short", "HEAD"], text=True)  # noqa: S607
 print(f"Current build: {current_build}")
 
 docs = Path(__file__).parent / "docs"

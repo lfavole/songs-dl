@@ -52,9 +52,7 @@ def _get_apic_tag(value: list[Picture]) -> TagParams:
             continue
         params["type"] = 3
         params["desc"] = picture.url
-        params["mime"] = get_image_mimetype(
-            mimetype=picture.req.headers.get("Content-Type"), url=picture.url
-        )
+        params["mime"] = get_image_mimetype(mimetype=picture.req.headers.get("Content-Type"), url=picture.url)
         params["data"] = data
         if Image is not None:
             try:
@@ -78,10 +76,7 @@ def add_tags(actions: "ActionsGroup[list[Song]]", filename: str) -> tuple[str, s
 
     # tags (itunes -> musixmatch -> deezer -> youtube)
     tags_list = merge_dicts(
-        *(
-            {key: value for key, value in action.results[0].to_id3().items() if value}
-            for action in actions
-        )
+        *({key: value for key, value in action.results[0].to_id3().items() if value} for action in actions)
     )
 
     logger.debug("ID3 tags:\n%s", "\n".join([f"{a}: {pformat(b)}" for a, b in tags_list.items()]))

@@ -1,6 +1,4 @@
-"""
-Songs downloader.
-"""
+"""Songs downloader."""
 
 import sys
 

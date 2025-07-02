@@ -1,18 +1,20 @@
 """Functions to get metadata and songs from YouTube Music."""
 
 import logging
-import sys
 
 import requests
 
-from .utils import Picture, PictureProvider, format_query, get
-from .youtube import YoutubeSong
+from .utils import Picture, PictureProvider, format_query, get, locked
+from .youtube import YoutubeSong, youtube_lock
 
 logger = logging.getLogger(__name__)
 
 
 class YoutubeMusicPictureProvider(PictureProvider):
+    """A class to provide pictures from YouTube Music search results."""
+
     def get_sure_pictures(self) -> list[Picture]:
+        """Get the pictures from the YouTube Music search result."""
         return [
             Picture(
                 get(picture, "url", str),
@@ -24,7 +26,8 @@ class YoutubeMusicPictureProvider(PictureProvider):
         ]
 
 
-def parse_duration(duration):
+def parse_duration(duration: str) -> int:
+    """Parse a duration string in the format HH:MM:SS or MM:SS into seconds."""
     return sum(
         # 0 = 1 (seconds); 1 = 60 (minutes); 2 = 3600 (hours); ...
         int(value or 0) * (60**index)
@@ -36,7 +39,7 @@ def download_youtube_music(song: str, artist: str | None = None, _market: str | 
     """Get the YouTube Music search results."""
     logger.info("Searching %s on YouTube Music...", format_query(song, artist))
     query = f"{song} {artist}" if artist else song
-    req = requests.post(
+    req = locked(youtube_lock)(requests.post)(
         "https://music.youtube.com/youtubei/v1/search?prettyPrint=false",
         headers={
             "Origin": "https://music.youtube.com",
@@ -63,7 +66,20 @@ def download_youtube_music(song: str, artist: str | None = None, _market: str | 
         logger.critical("JSON decoding error: %s", err)  # same thing
         return []
 
-    interessant_data = get(result, ("contents", "tabbedSearchResultsRenderer", "tabs", 0, "tabRenderer", "content", "sectionListRenderer", "contents"), list)
+    interessant_data = get(
+        result,
+        (
+            "contents",
+            "tabbedSearchResultsRenderer",
+            "tabs",
+            0,
+            "tabRenderer",
+            "content",
+            "sectionListRenderer",
+            "contents",
+        ),
+        list,
+    )
 
     for item in interessant_data:
         result = None
@@ -79,16 +95,36 @@ def download_youtube_music(song: str, artist: str | None = None, _market: str | 
 
     ret = []
 
-    for song in interessant_data:
-        song = get(song, "musicResponsiveListItemRenderer", dict)
+    for item in interessant_data:
+        item = get(item, "musicResponsiveListItemRenderer", dict)  # noqa: PLW2901
         ret.append(
             YoutubeSong(
-                title=get(song, ("flexColumns", 0, "musicResponsiveListItemFlexColumnRenderer", "text", "runs", 0, "text"), str),
-                artists=[get(song, ("flexColumns", 1, "musicResponsiveListItemFlexColumnRenderer", "text", "runs", 0, "text"), str)],
-                album=get(song, ("flexColumns", 1, "musicResponsiveListItemFlexColumnRenderer", "text", "runs", 2, "text"), str),
-                duration=parse_duration(get(song, ("flexColumns", 1, "musicResponsiveListItemFlexColumnRenderer", "text", "runs", -1, "text"), str)),
-                picture=YoutubeMusicPictureProvider(song),
-                youtube_video=get(song, ("playlistItemData", "videoId"), str),
+                title=get(
+                    item,
+                    ("flexColumns", 0, "musicResponsiveListItemFlexColumnRenderer", "text", "runs", 0, "text"),
+                    str,
+                ),
+                artists=[
+                    get(
+                        item,
+                        ("flexColumns", 1, "musicResponsiveListItemFlexColumnRenderer", "text", "runs", 0, "text"),
+                        str,
+                    )
+                ],
+                album=get(
+                    item,
+                    ("flexColumns", 1, "musicResponsiveListItemFlexColumnRenderer", "text", "runs", 2, "text"),
+                    str,
+                ),
+                duration=parse_duration(
+                    get(
+                        item,
+                        ("flexColumns", 1, "musicResponsiveListItemFlexColumnRenderer", "text", "runs", -1, "text"),
+                        str,
+                    )
+                ),
+                picture=YoutubeMusicPictureProvider(item),
+                youtube_video=get(item, ("playlistItemData", "videoId"), str),
             )
         )
 

@@ -11,7 +11,8 @@ from typing import cast
 
 from rich import get_console
 from rich.progress import Progress
-from rich.traceback import Traceback, install as install_traceback
+from rich.traceback import Traceback
+from rich.traceback import install as install_traceback
 from yt_dlp.utils import sanitize_filename
 
 from .deezer import download_deezer
@@ -56,7 +57,7 @@ def parse_query(query: str) -> tuple[str, str | None, str | None]:
     return song, artist, market
 
 
-def download_song(query: str, progress: Progress | None = None, parent: ActionsGroup | None = None) -> str | None:
+def download_song(query: str, progress: Progress | None = None, parent: ActionsGroup | None = None) -> str | None:  # noqa: C901, PLR0912
     """Download a song with ID3 tags (title, artist, lyrics...). Return the path of the song or `None`."""
     install_traceback(show_locals=True)
 
@@ -119,12 +120,11 @@ def download_song(query: str, progress: Progress | None = None, parent: ActionsG
     # order the results
     for action in metadata_actions:
         action.results = order_results(action.description, get_best_songs(action), action.results)
-        if action._description in ("YouTube", "YouTube Music"):
+        if action._description in {"YouTube", "YouTube Music"}:  # noqa: SLF001
             if action.results:
                 best_video = best_video or cast("YoutubeSong", action.results[0])
-        else:
-            if not action.results:
-                action.results.append(Song.empty())
+        elif not action.results:
+            action.results.append(Song.empty())
 
     if not best_video:
         logger.error("No videos available!")
