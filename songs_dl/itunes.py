@@ -31,13 +31,15 @@ class ItunesPictureProvider(PictureProvider):
         return pictures
 
 
-def download_itunes(song: str, artist: str | None = None, market: str | None = None) -> list[Song]:
+def download_itunes(song: str, artist: str | None = None, market: str | None = None, best: bool = False) -> list[Song]:
     """Fetch the iTunes search results."""
     logger.info("Searching %s on iTunes...", format_query(song, artist, market))
     query = f"{song} {artist}" if artist else song
     params = {"term": query, "entity": "song"}
     if market:
         params["country"] = market
+    if not best:
+        params["limit"] = 5
     req = locked(itunes_lock)(requests.get)("https://itunes.apple.com/search", params=params)
     try:
         # decode the JSON data

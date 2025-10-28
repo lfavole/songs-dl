@@ -8,7 +8,9 @@ import logging
 import math
 import operator
 import re
-from collections.abc import Callable, Iterable, Sequence
+import subprocess as sp  # noqa: S404
+import tempfile
+from collections.abc import Callable, Generator, Iterable, Sequence
 from io import BytesIO
 from threading import Lock
 from typing import (
@@ -235,13 +237,7 @@ class Picture:
     def _load_metadata(self) -> None:
         if self.data:
             self.sure = True
-            if Image is not None:
-                try:
-                    img = Image.open(BytesIO(self.data))
-                    self._pillow = img
-                    self.width, self.height = img.size
-                except OSError:
-                    pass
+            _ = self._pillow  # Load the image with Pillow
 
     @property
     def pillow(self) -> Image.Image | None:  # noqa: D102
@@ -251,8 +247,34 @@ class Picture:
         if not isinstance(self.data, bytes) or Image is None:
             return None
 
-        self._pillow = Image.open(BytesIO(self.data))
+        self._load_pillow()
+        if self._pillow:
+            self.width, self.height = self._pillow.size
         return self._pillow
+
+    def _load_pillow(self) -> Image.Image | None:
+        if Image is None:
+            return None
+
+        try:
+            return Image.open(BytesIO(self.data))
+        except OSError:
+            pass
+
+        with (
+            tempfile.TemporaryFile() as tmpif,
+            tempfile.TemporaryFile(suffix=".jpg") as tmpof,
+        ):
+            tmpif.write(self.data)
+            tmpof.close()
+            try:
+                sp.run(["ffmpeg", "-i", tmpif.name, tmpof.name], check=True)  # noqa: S603, S607
+            except sp.CalledProcessError:
+                return None
+
+            ret = Image.open(tmpof.name)
+            ret.load()
+            return ret
 
     @property
     def size(self) -> float:
@@ -317,9 +339,22 @@ class PictureProvider:
 
             for size in sizes_to_try:
                 if not any(pic.size == size for pic in self.pictures):
-                    url = self.get_url_for_size(size)
-                    if url:
+                    try:
+                        url = next(self.get_pictures_for_size(size)).url
+                    except GeneratorExit:
+                        pass
+                    else:
                         self.pictures.append(Picture(url, size, sure=False))
+
+            extension = None
+            # heic support is very bad for pillow and ffmpeg
+            if "Deezer" in type(self).__name__ or "Itunes" in type(self).__name__:
+                extension = "webp"
+            if extension:
+                self.pictures = [
+                    *self.get_pictures_for_extension(extension),
+                    *self.pictures,
+                ]
 
             self.pictures.sort(key=lambda pic: pic.size, reverse=True)
 
@@ -327,9 +362,9 @@ class PictureProvider:
         """Return a list of all the sure pictures."""
         raise NotImplementedError
 
-    def get_url_for_size(self, size: int) -> str | None:
+    def get_pictures_for_size(self, size: int) -> Generator[Picture, None, None]:
         """
-        Return a (probably) valid URL for the given size, if possible.
+        Return pictures with (probably) valid URLs for the given size, if possible.
 
         The default implementation tries to replace the size of a picture with the asked size for all the pictures.
         If the URLs do not contain the size, this method should be overridden and return `None`.
@@ -341,9 +376,24 @@ class PictureProvider:
             url_parts = picture_url.split("/")
             if str(picture_size) in url_parts[-1]:
                 url_parts[-1] = url_parts[-1].replace(str(picture_size), str(size))
-                return "/".join(url_parts)
+                yield Picture("/".join(url_parts), picture.width, picture.height, False)
 
-        return None
+    def get_pictures_for_extension(self, extension: str) -> Generator[Picture, None, None]:
+        """
+        Return pictures with (probably) valid URLs for the given extension, if possible.
+
+        The default implementation tries to replace the extension of a picture with the asked extension
+        for all the pictures.
+        If the URLs do not contain the extension, this method should be overridden and return `None`.
+        """
+        for picture in self.pictures:
+            picture_extension = "jpg"
+            picture_url = picture.url
+
+            url_parts = picture_url.split("/")
+            if str(picture_extension) in url_parts[-1]:
+                url_parts[-1] = url_parts[-1].replace(str(picture_extension), str(extension))
+                yield Picture("/".join(url_parts), picture.width, picture.height, False)
 
     @property
     def best_picture(self) -> Picture:

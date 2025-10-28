@@ -159,13 +159,15 @@ def lazy_string(func: Callable[[], str]) -> str:
     return LazyString()  # type: ignore[return-value]
 
 
-def download_musixmatch(song: str, artist: str | None = None, market: str | None = None) -> list[Song]:
+def download_musixmatch(
+    song: str, artist: str | None = None, market: str | None = None, best: bool = False
+) -> list[Song]:
     """Fetch the Musixmatch search results."""
     logger.info("Searching %s on Musixmatch...", format_query(song, artist, market))
     query = f"{song} {artist}" if artist else song
 
     try:
-        data = get_api("track.search", {"q": query, "limit": 20})
+        data = get_api("track.search", {"q": query, "limit": 20 if best else 5})
     except ValueError:
         return []
     tracks = get(data, ("message", "body", "track_list"), list)

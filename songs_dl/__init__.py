@@ -57,7 +57,9 @@ def parse_query(query: str) -> tuple[str, str | None, str | None]:
     return song, artist, market
 
 
-def download_song(query: str, progress: Progress | None = None, parent: ActionsGroup | None = None) -> str | None:  # noqa: C901, PLR0912
+def download_song(  # noqa: C901, PLR0912
+    query: str, progress: Progress | None = None, parent: ActionsGroup | None = None, best: bool = False
+) -> str | None:
     """Download a song with ID3 tags (title, artist, lyrics...). Return the path of the song or `None`."""
     install_traceback(show_locals=True)
 
@@ -66,17 +68,21 @@ def download_song(query: str, progress: Progress | None = None, parent: ActionsG
     song, artist, market = parse_query(query)
 
     # Providers sorted by confidence
-    metadata_actions: ActionsGroup[list[Song]] = ActionsGroup(
-        "Fetching metadata...",
-        [
-            Action("iTunes", download_itunes),
-            Action("YouTube Music", download_youtube_music),
+    metadata_actions_list = [
+        Action("iTunes", download_itunes),
+        Action("YouTube Music", download_youtube_music),
+    ]
+    if best:
+        metadata_actions_list.extend([
             Action("MusicBrainz", download_musicbrainz),
             Action("Musixmatch", download_musixmatch),
             Action("LRCLIB", download_lrclib),
             Action("Deezer", download_deezer),
             Action("YouTube", download_youtube),
-        ],
+        ])
+    metadata_actions: ActionsGroup[list[Song]] = ActionsGroup(
+        "Fetching metadata...",
+        metadata_actions_list,
         expandable=True,
         no_task=True,
     )
@@ -102,7 +108,7 @@ def download_song(query: str, progress: Progress | None = None, parent: ActionsG
     # Display the results in order
     for action in metadata_actions:
         if action.error:
-            print(f"Error when executing {action.description}:", file=sys.stderr)
+            print(f"Error when executing {action._description}:", file=sys.stderr)  # noqa: SLF001
             if logger.isEnabledFor(logging.INFO):
                 get_console().print(
                     Traceback.from_exception(type(action.error), action.error, action.error.__traceback__)
@@ -144,7 +150,7 @@ def download_song(query: str, progress: Progress | None = None, parent: ActionsG
         final_filename = filename
     logger.info("Final filename: %s", final_filename)
 
-    if "USLT" in tags_list:
+    if tags_list.get("USLT", [None])[0]:
         Path(final_filename.rsplit(".", 1)[0] + ".lrc").write_text(tags_list["USLT"][0] + "\n", "utf-8")
 
     add_tags_action.completed = 1
@@ -164,6 +170,9 @@ def main() -> None:
         type=int,
         default=10,
         help="number of songs to download in the same time",
+    )
+    parser.add_argument(
+        "--best", action="store_true", help="download information from all providers, uses more internet"
     )
     parser.add_argument("-v", "--verbose", action="count", default=0, help="show more information")
 
@@ -195,7 +204,7 @@ def main() -> None:
             max_workers=args.max_workers,
         )
         for song in args.SONG:
-            actions.add_action(Action(song, partial(download_song, song, parent=actions)))
+            actions.add_action(Action(song, partial(download_song, song, parent=actions, best=args.best)))
         actions()
 
 

@@ -50,8 +50,8 @@ class MusicBrainzPictureProvider(PictureProvider):
 
     def __init__(self, *args, **kwargs) -> None:
         """Initialize the MusicBrainz picture provider."""
+        self._data = None  # the constructor checks self.pictures that needs self._data
         super().__init__(*args, **kwargs)
-        self._data = None
 
     @property
     def data(self) -> dict:
@@ -86,7 +86,9 @@ class MusicBrainzPictureProvider(PictureProvider):
         return LazyList(real_get_pictures)
 
 
-def download_musicbrainz(song: str, artist: str | None = None, market: str | None = None) -> list[Song]:
+def download_musicbrainz(  # noqa: C901
+    song: str, artist: str | None = None, market: str | None = None, best: bool = False
+) -> list[Song]:
     """Fetch the MusicBrainz search results."""
     logger.info("Searching %s on MusicBrainz...", format_query(song, artist, market))
 
@@ -100,6 +102,8 @@ def download_musicbrainz(song: str, artist: str | None = None, market: str | Non
     }
     if market:
         params["market"] = market
+    if not best:
+        params["limit"] = 5
     req = locked(musicbrainz_lock)(requests.get)(
         "https://musicbrainz.org/ws/2/recording",
         params=params,
