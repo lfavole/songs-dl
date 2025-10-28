@@ -28,7 +28,7 @@ from .youtube import YoutubeSong, download_youtube
 from .youtube_dl import download_youtube_dl
 from .ytmusic import download_youtube_music
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 logger = logging.getLogger(__name__)
 
