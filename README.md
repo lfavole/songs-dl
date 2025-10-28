@@ -37,6 +37,5 @@ To install the latest changes:
 
 ## Bumping the version
 
-	uv sync --extra dev
-    uv run bump-my-version bump major | minor | patch
+    uv run --extra dev bump-my-version bump major | minor | patch
 </details>
