@@ -170,12 +170,12 @@ class DeezerLazySong(Song):
         pass
 
     @property
-    def copyright(self) -> str:
+    def copyright_info(self) -> str:
         """Copyright of the song."""
         return get(self.data, "COPYRIGHT", str).strip("©").strip()
 
-    @copyright.setter
-    def copyright(self, _value: str) -> None:
+    @copyright_info.setter
+    def copyright_info(self, _value: str) -> None:
         pass
 
     @property

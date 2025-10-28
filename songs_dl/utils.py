@@ -467,7 +467,7 @@ class Song:
         release_date: str | dt.date | None = None,
         isrc: str | None = None,
         track_number: int | tuple[int, int | None] | None = None,
-        copyright: str | None = None,  # noqa: A002
+        copyright_info: str | None = None,
         lyrics: str | list[tuple[str, float]] | None = None,
         picture: Picture | PictureProvider | None = None,
         comments: str | None = None,
@@ -489,7 +489,7 @@ class Song:
             self.release_date = release_date
         self.isrc = isrc
         self.track_number = (track_number, None) if isinstance(track_number, int) else track_number
-        self.copyright = copyright
+        self.copyright_info = copyright_info
         self.lyrics = lyrics.rstrip() if isinstance(lyrics, str) else lyrics
         self.picture = picture
         self.comments = comments
@@ -543,7 +543,7 @@ class Song:
                 if self.track_number
                 else ""
             ),
-            "TCOP": self.copyright or "",
+            "TCOP": self.copyright_info or "",
             "TLAN": self.language or "",
             "TCON": self.genre or "",
             "USLT": (
@@ -621,7 +621,7 @@ class Song:
             release_date=release_date,
             isrc=get_tag("TSRC"),
             track_number=track_n,
-            copyright=get_tag("TCOP"),
+            copyright_info=get_tag("TCOP"),
             lyrics=get_tag("USLT"),
             picture=Picture(data=pictures[0].data, url=pictures[0].desc) if pictures else None,
             comments=get_tag("COMM"),
@@ -746,8 +746,8 @@ def order_results(provider: str, best_items: list[Song], results: list[Song] | N
         if official_match:
             official_match += len(re.findall(r"(?i)\baudio\b", song_title)) * 100
 
-        if best_item.copyright:
-            copyright_match = 80 + (_normalize_sentence(best_item.copyright) in all_r_artists) * 20
+        if best_item.copyright_info:
+            copyright_match = 80 + (_normalize_sentence(best_item.copyright_info) in all_r_artists) * 20
         else:
             copyright_match = 100
 
