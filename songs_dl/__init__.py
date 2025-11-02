@@ -71,12 +71,12 @@ def download_song(  # noqa: C901, PLR0912
     metadata_actions_list = [
         Action("iTunes", download_itunes),
         Action("YouTube Music", download_youtube_music),
+        Action("LRCLIB", download_lrclib),
     ]
     if best:
+        metadata_actions_list.insert(2, Action("MusicBrainz", download_musicbrainz))
+        metadata_actions_list.insert(3, Action("Musixmatch", download_musixmatch))
         metadata_actions_list.extend([
-            Action("MusicBrainz", download_musicbrainz),
-            Action("Musixmatch", download_musixmatch),
-            Action("LRCLIB", download_lrclib),
             Action("Deezer", download_deezer),
             Action("YouTube", download_youtube),
         ])
@@ -194,7 +194,7 @@ def main() -> None:
     # If there is only one song, download it on the main thread
     with Progress(transient=True) as progress:
         if len(args.SONG) == 1:
-            download_song(args.SONG[0], progress)
+            download_song(args.SONG[0], progress, best=args.best)
             return
 
         actions = ActionsGroup(
