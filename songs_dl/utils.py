@@ -697,6 +697,7 @@ def order_results(provider: str, best_items: list[Song], results: list[Song] | N
 
     def normalize_title(title: str) -> str:
         title = re.sub(r"\.\s*(?=\w\W|\w$|$)", "", title)
+        title = re.sub(r"\s*/\s*x\b", "ix", title)  # HUNTR/X
         title = re.sub(r"\bst(e?s?)(\s+|$)", r"saint\1\2", title)
         title = re.sub(r"(?<=\w)\W+(ve|d|ll|s|m|re)", r"\1", title)
         title = re.sub(r"(?<=\wn)\W+t", r"t", title)
